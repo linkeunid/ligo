@@ -3,11 +3,11 @@ package echo
 import (
 	"testing"
 
-	"github.com/linkeunid/ligo"
+	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
 func TestAdapterImplementsRouter(t *testing.T) {
-	var _ ligo.Router = NewAdapter()
+	var _ httpifc.Router = NewAdapter()
 }
 
 func TestAdapterGroup(t *testing.T) {
@@ -21,7 +21,7 @@ func TestAdapterGroup(t *testing.T) {
 func TestAdapterHandle(t *testing.T) {
 	a := NewAdapter()
 	called := false
-	a.Handle("GET", "/test", func(ctx ligo.Context) error {
+	a.Handle("GET", "/test", func(ctx httpifc.Context) error {
 		called = true
 		return ctx.String(200, "ok")
 	})
@@ -43,7 +43,7 @@ func TestAdapterServe(t *testing.T) {
 func TestGroupAdapterImplementsRouter(t *testing.T) {
 	a := NewAdapter()
 	g := a.Group("/api")
-	var _ ligo.Router = g
+	var _ httpifc.Router = g
 }
 
 func TestGroupAdapterGroup(t *testing.T) {

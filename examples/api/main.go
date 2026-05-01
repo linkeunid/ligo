@@ -6,8 +6,8 @@ import (
 
 	"github.com/linkeunid/ligo"
 	"github.com/linkeunid/ligo/adapters/echo"
-	"github.com/linkeunid/ligo/cmd/api/internal/middleware"
-	"github.com/linkeunid/ligo/cmd/api/internal/user"
+	"github.com/linkeunid/ligo/examples/api/internal/middleware"
+	"github.com/linkeunid/ligo/examples/api/internal/user"
 )
 
 func main() {

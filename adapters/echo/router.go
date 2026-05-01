@@ -4,12 +4,13 @@ import (
 	"net/http"
 
 	echo "github.com/labstack/echo/v5"
-	"github.com/linkeunid/ligo"
+	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
-// Adapter implements ligo.Router using Echo v5.
+// Adapter implements httpifc.Router using Echo v5.
 type Adapter struct {
-	e *echo.Echo
+	e          *echo.Echo
+	middleware []httpifc.Middleware
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -20,20 +21,32 @@ func NewAdapter() *Adapter {
 }
 
 // Group creates a sub-router with a prefix.
-func (a *Adapter) Group(prefix string) ligo.Router {
-	return &groupAdapter{g: a.e.Group(prefix)}
+func (a *Adapter) Group(prefix string) httpifc.Router {
+	return &groupAdapter{
+		g:         a.e.Group(prefix),
+		middleware: a.middleware, // inherit global middleware
+	}
 }
 
 // Use adds middleware to the router.
-func (a *Adapter) Use(mw ...ligo.Middleware) {
-	// Middleware applied per-route in Handle method
+func (a *Adapter) Use(mw ...httpifc.Middleware) {
+	a.middleware = append(a.middleware, mw...)
 }
 
-// Handle registers a route.
-func (a *Adapter) Handle(method, path string, handler ligo.HandlerFunc) {
-	a.e.Add(method, path, func(c *echo.Context) error {
-		return handler(&contextAdapter{c: c})
-	})
+// Handle registers a route with middleware chain.
+func (a *Adapter) Handle(method, path string, handler httpifc.HandlerFunc) {
+	a.e.Add(method, path, a.wrapHandler(handler))
+}
+
+// wrapHandler applies middleware chain to handler.
+func (a *Adapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
+	wrapped := handler
+	for i := len(a.middleware) - 1; i >= 0; i-- {
+		wrapped = a.middleware[i](wrapped)
+	}
+	return func(c *echo.Context) error {
+		return wrapped(newContextAdapter(c))
+	}
 }
 
 // Serve starts the HTTP server.
@@ -42,19 +55,33 @@ func (a *Adapter) Serve(addr string) error {
 }
 
 type groupAdapter struct {
-	g *echo.Group
+	g          *echo.Group
+	middleware []httpifc.Middleware
 }
 
-func (g *groupAdapter) Group(prefix string) ligo.Router {
-	return &groupAdapter{g: g.g.Group(prefix)}
+func (g *groupAdapter) Group(prefix string) httpifc.Router {
+	return &groupAdapter{
+		g:          g.g.Group(prefix),
+		middleware: g.middleware,
+	}
 }
 
-func (g *groupAdapter) Use(mw ...ligo.Middleware) {}
+func (g *groupAdapter) Use(mw ...httpifc.Middleware) {
+	g.middleware = append(g.middleware, mw...)
+}
 
-func (g *groupAdapter) Handle(method, path string, handler ligo.HandlerFunc) {
-	g.g.Add(method, path, func(c *echo.Context) error {
-		return handler(&contextAdapter{c: c})
-	})
+func (g *groupAdapter) Handle(method, path string, handler httpifc.HandlerFunc) {
+	g.g.Add(method, path, g.wrapHandler(handler))
+}
+
+func (g *groupAdapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
+	wrapped := handler
+	for i := len(g.middleware) - 1; i >= 0; i-- {
+		wrapped = g.middleware[i](wrapped)
+	}
+	return func(c *echo.Context) error {
+		return wrapped(newContextAdapter(c))
+	}
 }
 
 func (g *groupAdapter) Serve(addr string) error {
@@ -62,7 +89,15 @@ func (g *groupAdapter) Serve(addr string) error {
 }
 
 type contextAdapter struct {
-	c *echo.Context
+	c      *echo.Context
+	values map[string]any
+}
+
+func newContextAdapter(c *echo.Context) *contextAdapter {
+	return &contextAdapter{
+		c:      c,
+		values: make(map[string]any),
+	}
 }
 
 func (ca *contextAdapter) Request() *http.Request {
@@ -87,4 +122,12 @@ func (ca *contextAdapter) JSON(code int, v any) error {
 
 func (ca *contextAdapter) String(code int, s string) error {
 	return ca.c.String(code, s)
+}
+
+func (ca *contextAdapter) Set(key string, val any) {
+	ca.values[key] = val
+}
+
+func (ca *contextAdapter) Get(key string) any {
+	return ca.values[key]
 }

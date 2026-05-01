@@ -1,0 +1,220 @@
+package container
+
+import (
+	"fmt"
+	"reflect"
+	"sync"
+)
+
+// Container holds registered providers and resolves dependencies.
+type Container struct {
+	mu        sync.RWMutex
+	providers map[reflect.Type]ProviderEntry
+	cache     sync.Map // map[reflect.Type]any — thread-safe cache
+	locks     sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
+}
+
+// ProviderEntry represents a registered provider in the container.
+type ProviderEntry struct {
+	factory   func(args []reflect.Value) (any, error)
+	eager     any
+	argTypes  []reflect.Type
+	transient bool
+	exported  bool
+}
+
+// New creates a new DI container.
+func New() *Container {
+	return &Container{
+		providers: make(map[reflect.Type]ProviderEntry),
+	}
+}
+
+// Types returns all registered types in the container.
+func (c *Container) Types() []reflect.Type {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	types := make([]reflect.Type, 0, len(c.providers))
+	for t := range c.providers {
+		types = append(types, t)
+	}
+	return types
+}
+
+// Register adds a provider to the container.
+func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, exists := c.providers[typ]; exists {
+		panic(&ErrDuplicateProvider{Type: typ.String()})
+	}
+	c.providers[typ] = entry
+}
+
+// Resolve returns an instance of type T from the container.
+func Resolve[T any](c *Container) T {
+	var zero T
+	typ := reflect.TypeOf(zero)
+
+	instance, err := c.resolve(typ, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return instance.(T)
+}
+
+// ResolveByType returns an instance of the specified type from the container.
+// Returns nil if the type is not registered.
+func ResolveByType(c *Container, typ reflect.Type) any {
+	instance, _ := c.resolve(typ, nil)
+	return instance
+}
+
+// resolve resolves a type, tracking the dependency chain for cycle detection.
+// Cycle detection uses chain (per-call), NOT global resolving map.
+func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error) {
+	// Check for cycle using chain (per-call, not global)
+	// This prevents deadlock: we detect cycle BEFORE trying to acquire lock
+	for _, t := range chain {
+		if t == typ {
+			return nil, &ErrCircularDependency{
+				Chain: chainToStrings(append(chain, typ)),
+			}
+		}
+	}
+
+	// Check provider exists (read lock on providers map)
+	c.mu.RLock()
+	entry, ok := c.providers[typ]
+	c.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("ligo: missing dependency %s", typ.String())
+	}
+
+	// Transient: skip ALL locking and caching - each resolve is independent
+	if entry.transient {
+		return c.build(typ, entry, chain)
+	}
+
+	// Singleton: check cache before locking
+	if val, ok := c.cache.Load(typ); ok {
+		return val, nil
+	}
+
+	// Singleton: per-type double-check locking
+	lockIface, _ := c.locks.LoadOrStore(typ, &sync.Mutex{})
+	lock := lockIface.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Double-check: another goroutine may have resolved it
+	if val, ok := c.cache.Load(typ); ok {
+		return val, nil
+	}
+
+	// Build the instance
+	instance, err := c.build(typ, entry, chain)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in cache
+	c.cache.Store(typ, instance)
+	return instance, nil
+}
+
+// build constructs an instance from an entry.
+func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect.Type) (any, error) {
+	// Eager value (pre-built instance)
+	if entry.eager != nil {
+		return entry.eager, nil
+	}
+
+	// Factory with auto-injection
+	if entry.factory != nil {
+		newChain := append(chain, typ)
+		args := make([]reflect.Value, len(entry.argTypes))
+		for i, argType := range entry.argTypes {
+			arg, err := c.resolve(argType, newChain)
+			if err != nil {
+				return nil, &ErrMissingDependency{
+					Type:       argType.String(),
+					RequiredBy: typ.String(),
+				}
+			}
+			args[i] = reflect.ValueOf(arg)
+		}
+
+		instance, err := entry.factory(args)
+		if err != nil {
+			return nil, &DIError{
+				Type:       typ.String(),
+				RequiredBy: "",
+				Cause:      err,
+			}
+		}
+		return instance, nil
+	}
+
+	return nil, nil
+}
+
+// ErrMissingDependency is returned when a required provider is not found.
+type ErrMissingDependency struct {
+	Type       string
+	RequiredBy string
+}
+
+func (e *ErrMissingDependency) Error() string {
+	return fmt.Sprintf("ligo: missing dependency %s (required by %s)", e.Type, e.RequiredBy)
+}
+
+// ErrCircularDependency is returned when a circular dependency is detected.
+type ErrCircularDependency struct {
+	Chain []string
+}
+
+func (e *ErrCircularDependency) Error() string {
+	return fmt.Sprintf("ligo: circular dependency detected: %v", e.Chain)
+}
+
+// ErrDuplicateProvider is returned when a provider is registered twice for the same type.
+type ErrDuplicateProvider struct {
+	Type string
+}
+
+func (e *ErrDuplicateProvider) Error() string {
+	return fmt.Sprintf("ligo: duplicate provider for type %s", e.Type)
+}
+
+// DIError wraps container resolution failures with context.
+type DIError struct {
+	Type       string
+	RequiredBy string
+	Cause      error
+}
+
+func (e *DIError) Error() string {
+	return fmt.Sprintf("ligo: cannot resolve %s for %s: %v", e.Type, e.RequiredBy, e.Cause)
+}
+
+func chainToStrings(chain []reflect.Type) []string {
+	strs := make([]string, len(chain))
+	for i, t := range chain {
+		strs[i] = t.String()
+	}
+	return strs
+}
+
+// NewEntry creates a provider entry for registration.
+func NewEntry(factory func(args []reflect.Value) (any, error), eager any, argTypes []reflect.Type, transient, exported bool) ProviderEntry {
+	return ProviderEntry{
+		factory:   factory,
+		eager:     eager,
+		argTypes:  argTypes,
+		transient: transient,
+		exported:  exported,
+	}
+}

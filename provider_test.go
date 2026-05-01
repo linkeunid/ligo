@@ -4,6 +4,10 @@ import (
 	"testing"
 )
 
+type testService struct {
+	name string
+}
+
 func TestValueProvider(t *testing.T) {
 	svc := &testService{}
 	p := Value(svc)

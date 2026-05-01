@@ -5,14 +5,16 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/linkeunid/ligo/internal/container"
+	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/http"
 )
 
 // App is the core application instance.
 type App struct {
 	mu        sync.Mutex
 	started   bool
-	modules   []Module
+	modules   []module.Module
 	providers []Provider
 	container *container.Container
 	opts      options
@@ -30,7 +32,7 @@ func New(opts ...Option) *App {
 }
 
 // Register adds modules to the application.
-func (a *App) Register(modules ...Module) {
+func (a *App) Register(modules ...module.Module) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -80,9 +82,19 @@ func (a *App) Run() error {
 
 	// Register controllers if router is configured
 	if a.opts.router != nil {
-		if err := a.registerControllers(); err != nil {
+		// Build binder
+		binder := http.NewBinder(a.container, a.opts.router)
+
+		// Apply global middleware
+		for _, mw := range a.opts.middlewares {
+			a.opts.router.Use(mw)
+		}
+
+		// Bind all controllers with module middleware
+		if err := binder.BindControllers(a.modules); err != nil {
 			return err
 		}
+
 		return a.opts.router.Serve(a.opts.addr)
 	}
 
@@ -126,52 +138,22 @@ func (a *App) buildProviderEntry(p Provider) container.ProviderEntry {
 	}, nil, argTypes, p.transient, p.exported)
 }
 
-func (a *App) buildModule(parent *container.Container, mod Module) {
+func (a *App) buildModule(parent *container.Container, mod module.Module) {
 	// Create module container with parent
 	modContainer := parent // flat graph - modules share root container
 
 	// Register module providers
-	for _, p := range mod.providers {
-		if p.exported {
-			a.registerProvider(parent, p) // exported to root
+	for _, p := range mod.Providers {
+		provider := p.(Provider)
+		if provider.IsExported() {
+			a.registerProvider(parent, provider) // exported to root
 		} else {
-			a.registerProvider(modContainer, p)
+			a.registerProvider(modContainer, provider)
 		}
 	}
 
 	// Build child modules
-	for _, child := range mod.imports {
+	for _, child := range mod.Imports {
 		a.buildModule(parent, child)
 	}
-}
-
-func (a *App) registerControllers() error {
-	for _, mod := range a.modules {
-		for _, cc := range mod.controllers {
-			// Resolve dependencies from container
-			args := make([]reflect.Value, len(cc.argTypes))
-			for i, argType := range cc.argTypes {
-				resolved := container.ResolveByType(a.container, argType)
-				if resolved == nil {
-					return fmt.Errorf("ligo: missing dependency %s for controller", argType.String())
-				}
-				args[i] = reflect.ValueOf(resolved)
-			}
-
-			// Call constructor with resolved dependencies
-			fnValue := reflect.ValueOf(cc.fn)
-			out := fnValue.Call(args)
-			if len(out) == 0 {
-				return fmt.Errorf("ligo: controller constructor must return a Controller")
-			}
-			ctrl, ok := out[0].Interface().(Controller)
-			if !ok {
-				return fmt.Errorf("ligo: constructor must return Controller")
-			}
-			if ctrl != nil {
-				ctrl.Routes(a.opts.router)
-			}
-		}
-	}
-	return nil
 }

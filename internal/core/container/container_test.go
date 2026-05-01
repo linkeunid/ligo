@@ -1,7 +1,10 @@
 package container
 
 import (
+	"fmt"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -77,9 +80,9 @@ func TestResolveFactory(t *testing.T) {
 func TestResolveTransient(t *testing.T) {
 	c := New()
 
-	counter := 0
+	counter := atomic.Int32{}
 	factory := func(args []reflect.Value) (any, error) {
-		counter++
+		counter.Add(1)
 		return &testService{name: "transient"}, nil
 	}
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false))
@@ -90,17 +93,17 @@ func TestResolveTransient(t *testing.T) {
 	if svc1 == svc2 {
 		t.Fatal("expected different instances for transient")
 	}
-	if counter != 2 {
-		t.Fatalf("expected factory called 2 times, got %d", counter)
+	if counter.Load() != 2 {
+		t.Fatalf("expected factory called 2 times, got %d", counter.Load())
 	}
 }
 
 func TestResolveSingleton(t *testing.T) {
 	c := New()
 
-	counter := 0
+	counter := atomic.Int32{}
 	factory := func(args []reflect.Value) (any, error) {
-		counter++
+		counter.Add(1)
 		return &testService{name: "singleton"}, nil
 	}
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false))
@@ -111,8 +114,8 @@ func TestResolveSingleton(t *testing.T) {
 	if svc1 != svc2 {
 		t.Fatal("expected same instance for singleton")
 	}
-	if counter != 1 {
-		t.Fatalf("expected factory called 1 time, got %d", counter)
+	if counter.Load() != 1 {
+		t.Fatalf("expected factory called 1 time, got %d", counter.Load())
 	}
 }
 
@@ -179,4 +182,76 @@ func TestDuplicateProvider(t *testing.T) {
 	}()
 
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{}, nil, false, false))
+}
+
+// TestConcurrentResolve verifies thread-safe singleton creation.
+func TestConcurrentResolve(t *testing.T) {
+	c := New()
+	counter := atomic.Int32{}
+	factory := func(args []reflect.Value) (any, error) {
+		counter.Add(1)
+		return &testService{name: "concurrent"}, nil
+	}
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false))
+
+	// Resolve concurrently from 10 goroutines
+	var wg sync.WaitGroup
+	results := make([]*testService, 10)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = Resolve[*testService](c)
+		}(i)
+	}
+	wg.Wait()
+
+	// All results should be the same singleton instance
+	for i := 1; i < len(results); i++ {
+		if results[i] != results[0] {
+			t.Fatal("expected same singleton instance across concurrent resolves")
+		}
+	}
+	// Factory should only be called once
+	if counter.Load() != 1 {
+		t.Fatalf("expected factory called 1 time, got %d", counter.Load())
+	}
+}
+
+// TestConcurrentTransient verifies concurrent transient resolves.
+func TestConcurrentTransient(t *testing.T) {
+	c := New()
+	counter := atomic.Int32{}
+	factory := func(args []reflect.Value) (any, error) {
+		n := counter.Add(1)
+		return &testService{name: fmt.Sprintf("instance-%d", n)}, nil
+	}
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false))
+
+	var wg sync.WaitGroup
+	results := make([]*testService, 10)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = Resolve[*testService](c)
+		}(i)
+	}
+	wg.Wait()
+
+	// All results should be different instances (transient)
+	instances := make(map[*testService]bool)
+	for i := 0; i < len(results); i++ {
+		if results[i] == nil {
+			t.Fatal("expected non-nil instance")
+		}
+		if instances[results[i]] {
+			t.Fatalf("expected unique instances for transient")
+		}
+		instances[results[i]] = true
+	}
+	// Factory should be called 10 times
+	if counter.Load() != 10 {
+		t.Fatalf("expected factory called 10 times, got %d", counter.Load())
+	}
 }

@@ -4,21 +4,17 @@ import (
 	"testing"
 )
 
-type testService struct {
-	name string
-}
-
 func TestNewModule(t *testing.T) {
 	mod := NewModule("users",
 		Providers(
 			Factory[*testService](func() *testService { return &testService{} }),
 		),
 	)
-	if mod.name != "users" {
-		t.Fatalf("expected name 'users', got %s", mod.name)
+	if mod.Name != "users" {
+		t.Fatalf("expected name 'users', got %s", mod.Name)
 	}
-	if len(mod.providers) != 1 {
-		t.Fatalf("expected 1 provider, got %d", len(mod.providers))
+	if len(mod.Providers) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(mod.Providers))
 	}
 }
 
@@ -27,8 +23,8 @@ func TestModuleWithImports(t *testing.T) {
 	parent := NewModule("parent",
 		Imports(child),
 	)
-	if len(parent.imports) != 1 {
-		t.Fatalf("expected 1 import, got %d", len(parent.imports))
+	if len(parent.Imports) != 1 {
+		t.Fatalf("expected 1 import, got %d", len(parent.Imports))
 	}
 }
 
@@ -36,7 +32,7 @@ func TestModuleWithControllers(t *testing.T) {
 	mod := NewModule("users",
 		Controllers(func() Controller { return nil }),
 	)
-	if len(mod.controllers) != 1 {
-		t.Fatalf("expected 1 controller, got %d", len(mod.controllers))
+	if len(mod.Controllers) != 1 {
+		t.Fatalf("expected 1 controller, got %d", len(mod.Controllers))
 	}
 }

@@ -3,7 +3,7 @@ package ligo
 import (
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/container"
+	"github.com/linkeunid/ligo/internal/core/container"
 )
 
 type testSvc struct {
