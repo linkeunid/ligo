@@ -43,32 +43,40 @@ go mod tidy
 
 ```
 ligo/
-├── app.go                  # Core App struct, Run(), DI setup
-├── router.go               # Re-exports: Router, HandlerFunc, Middleware, Context, Controller, Guard, Pipe, Interceptor, ExceptionFilter
-├── module.go               # Re-exports: Module, NewModule, Providers, Controllers, Middlewares, Imports
-├── provider.go             # Provider types: Value(), Factory(), Transient(), Export()
-├── options.go              # App options: WithRouter, WithAddr, WithMiddleware, WithLogger, OnStart, OnStop
-├── errors.go               # Error types: ErrAppAlreadyStarted, ErrMissingDependency, ErrCircularDependency, etc.
-├── adapters/
-│   └── echo/router.go      # Echo v5 adapter implementation with middleware chaining
+├── Public API (root level)
+├── app.go                  # App struct and public methods (New, Register, Provide, Run)
+├── router.go               # HTTP re-exports + built-in guards/pipes/interceptors
+├── module.go               # Module re-exports (Module, NewModule, ModuleOptions)
+├── provider.go             # Provider types (Value, Factory, Transient, Export)
+├── options.go              # App options (WithRouter, WithAddr, WithMiddleware, etc.)
+├── errors.go               # Error types
 ├── internal/
-│   ├── core/
-│   │   ├── container/      # DI container with thread-safe singletons and cycle detection
-│   │   ├── module/         # Module definition with Middlewares support
-│   │   ├── lifecycle/      # App lifecycle management
-│   │   ├── logger/         # NestJS-style logger with context levels
-│   │   └── resolver/       # Interface-based dependency resolution
-│   ├── http/
-│   │   ├── router.go      # Router interface + SetLoggerRouter for logging integration
-│   │   ├── context.go     # Context interface (with Set/Get for request-scoped data)
-│   │   ├── binder.go      # Controller registration with DI and middleware resolution
-│   │   ├── builder.go     # RouteBuilder for chain pattern
-│   │   └── chain.go       # ChainRouter for fluent HTTP methods
-│   └── testing/
-│       └── app.go         # Test helpers: NewTestApp, NewTestContainer, NewTestAppWithOverrides
+│   ├── app/                # App implementation details
+│   │   ├── app.go          # DI registration, module building
+│   │   └── server.go       # Server startup, graceful shutdown, port retry
+│   ├── core/               # Core DI, module system, logger, lifecycle, resolver
+│   ├── http/               # HTTP interfaces + chain/builder + built-ins
+│   │   ├── guards.go       # Built-in guards (RolesGuard, ThrottleGuard, etc.)
+│   │   ├── interceptors.go # Built-in interceptors (Timeout, Logging)
+│   │   ├── pipes.go        # Built-in pipes (Validation, ParseInt, etc.)
+│   │   ├── binder.go       # Controller registration with DI
+│   │   ├── builder.go      # RouteBuilder for chain pattern
+│   │   ├── chain.go        # ChainRouter for fluent API
+│   │   ├── context.go      # Context interface
+│   │   └── router.go       # Router interface
+│   ├── testing/            # Test helpers
+│   └── adapters/           # Concrete implementations
+│       └── echo/           # Echo v5 adapter
 └── docs/
-    └── features/          # Feature documentation
+    └── features/           # Feature documentation
 ```
+
+### Structure Principles
+- **Root files**: Minimal public API (11 files)
+- **internal/app/**: App implementation details (DI, server logic)
+- **internal/core/**: Framework core (DI container, module system, logger)
+- **internal/http/**: HTTP abstractions (adapter-agnostic interfaces + built-ins)
+- **internal/adapters/**: Concrete HTTP router implementations
 
 ## Key Components
 

@@ -5,38 +5,34 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/linkeunid/ligo/internal/app"
 	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 	"github.com/linkeunid/ligo/internal/http"
 )
 
-// App is the core application instance.
 type App struct {
 	mu           sync.Mutex
 	started      bool
 	modules      []module.Module
 	providers    []Provider
 	container    *container.Container
-	moduleHooks  struct {
-		onInit  [][]func() error
-		onDestroy [][]func() error
-	}
-	opts options
+	moduleHooks  *app.ModuleHooks
+	opts         options
 }
 
-// New creates a new Ligo application.
 func New(opts ...Option) *App {
 	op := defaultOptions()
 	for _, opt := range opts {
 		opt(&op)
 	}
 	return &App{
-		opts: op,
+		opts:        op,
+		moduleHooks: &app.ModuleHooks{},
 	}
 }
 
-// Register adds modules to the application.
 func (a *App) Register(modules ...module.Module) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -48,7 +44,6 @@ func (a *App) Register(modules ...module.Module) {
 	a.modules = append(a.modules, modules...)
 }
 
-// Provide registers ad-hoc providers at the root level.
 func (a *App) Provide(providers ...Provider) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -60,7 +55,6 @@ func (a *App) Provide(providers ...Provider) {
 	a.providers = append(a.providers, providers...)
 }
 
-// Run builds the DI container, resolves all providers, and starts the server.
 func (a *App) Run() error {
 	a.mu.Lock()
 	if a.started {
@@ -72,63 +66,47 @@ func (a *App) Run() error {
 
 	a.opts.logger.Info("Starting ligo application", logger.Field{Key: "context", Value: logger.ContextApp})
 
-	// Build root container
 	root := container.New()
 
-	// Register logger as a provider for injection (as interface type)
 	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
 	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true))
 
-	// Register root-level providers
 	for _, p := range a.providers {
-		a.registerProvider(root, p)
+		app.RegisterProvider(root, p)
 	}
 
-	// Build module graph and log dependencies
 	for _, mod := range a.modules {
-		a.buildModule(root, mod)
+		app.BuildModule(root, mod, a.moduleHooks)
 		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
 	}
 
 	a.container = root
 
-	// Execute OnStart hooks
 	for _, hook := range a.opts.onStart {
 		if err := hook(nil); err != nil {
 			return fmt.Errorf("OnStart hook failed: %w", err)
 		}
 	}
 
-	// Execute OnModuleInit hooks
-	for _, moduleHooks := range a.moduleHooks.onInit {
-		for _, hook := range moduleHooks {
-			if err := hook(); err != nil {
-				return fmt.Errorf("OnModuleInit hook failed: %w", err)
-			}
-		}
+	if err := app.ExecuteHooks(a.moduleHooks.OnInit, a.opts.logger, "OnModuleInit"); err != nil {
+		return err
 	}
 
-	// Register controllers if router is configured
 	if a.opts.router != nil {
-		// Set container on router for request-scoped DI
 		if sc, ok := a.opts.router.(http.SetContainerRouter); ok {
 			sc.SetContainer(root)
 		}
 
-		// Set logger on router if it supports it
 		if sl, ok := a.opts.router.(http.SetLoggerRouter); ok {
 			sl.SetLogger(a.opts.logger)
 		}
 
-		// Build binder
 		binder := http.NewBinder(a.container, a.opts.router, a.opts.logger)
 
-		// Apply global middleware
 		for _, mw := range a.opts.middlewares {
 			a.opts.router.Use(mw)
 		}
 
-		// Bind all controllers with module middleware
 		if err := binder.BindControllers(a.modules); err != nil {
 			return err
 		}
@@ -140,19 +118,23 @@ func (a *App) Run() error {
 	)
 
 	if a.opts.router != nil {
-		if a.opts.gracefulShutdown {
-			return a.runWithGracefulShutdown()
+		onStop := make([]func(any) error, len(a.opts.onStop))
+		for i, h := range a.opts.onStop {
+			onStop[i] = h
 		}
-		if a.opts.autoPort {
-			return a.serveWithRetry(a.opts.addr)
-		}
-		return a.opts.router.Serve(a.opts.addr)
+		return app.ServeWithRetry(app.ServeOptions{
+			Router:          a.opts.router,
+			Logger:          a.opts.logger,
+			Addr:            a.opts.addr,
+			AutoPort:        a.opts.autoPort,
+			GracefulTimeout: a.opts.gracefulTimeout,
+			ModuleHooks:     a.moduleHooks,
+			OnStop:          onStop,
+		})
 	}
 	return nil
 }
 
-// Container returns the internal container (escape hatch).
-// Panics if called before Run().
 func (a *App) Container() *container.Container {
 	if a.container == nil {
 		panic("ligo: cannot access container before Run()")
