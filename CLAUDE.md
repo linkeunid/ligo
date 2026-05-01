@@ -44,7 +44,7 @@ go mod tidy
 ```
 ligo/
 ├── app.go                  # Core App struct, Run(), DI setup
-├── router.go               # Re-exports: Router, HandlerFunc, Middleware, Context, Controller
+├── router.go               # Re-exports: Router, HandlerFunc, Middleware, Context, Controller, Guard, Pipe, Interceptor, ExceptionFilter
 ├── module.go               # Re-exports: Module, NewModule, Providers, Controllers, Middlewares, Imports
 ├── provider.go             # Provider types: Value(), Factory(), Transient(), Export()
 ├── options.go              # App options: WithRouter, WithAddr, WithMiddleware, WithLogger, OnStart, OnStop
@@ -61,12 +61,13 @@ ligo/
 │   ├── http/
 │   │   ├── router.go      # Router interface + SetLoggerRouter for logging integration
 │   │   ├── context.go     # Context interface (with Set/Get for request-scoped data)
-│   │   └── binder.go      # Controller registration with DI and middleware resolution
+│   │   ├── binder.go      # Controller registration with DI and middleware resolution
+│   │   ├── builder.go     # RouteBuilder for chain pattern
+│   │   └── chain.go       # ChainRouter for fluent HTTP methods
 │   └── testing/
 │       └── app.go         # Test helpers: NewTestApp, NewTestContainer, NewTestAppWithOverrides
-└── examples/
-    ├── basic-api/          # Simple inline module example
-    └── api/                # Full modular example with user module and middleware
+└── docs/
+    └── features/          # Feature documentation
 ```
 
 ## Key Components
@@ -137,7 +138,10 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - Root-level files are thin re-exports from `internal/` packages
 - HTTP abstractions in `internal/http/` are adapter-agnostic
 - Module middleware is resolved via DI and applied per module group
-- Request-scoped data via `ctx.Set(key, val)` / `ctx.Get(key)`
-- Logger uses NestJS-style context levels (ContextApp, ContextDIContainer, ContextRoutes, ContextLifecycle)
+- Request-scoped data via `ctx.Set(key, val)` / `ctx.Get(key)` - use constants for keys
+- Logger uses NestJS-style context levels (ContextApp, ContextDIContainer, ContextRoutes, ContextLifecycle, ContextMiddleware)
 - Middleware chaining is applied in reverse order (last middleware wraps first)
 - Echo adapter's `wrapHandlerWithMiddleware` is shared between Adapter and groupAdapter
+- Guards, Pipes, Interceptors, and Exception Filters use Go-idiomatic builder pattern (no decorators)
+- Logger is automatically registered as a provider and injectable
+- No hardcoded string keys or fmt.Printf in core code - use structured logging

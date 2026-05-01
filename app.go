@@ -75,6 +75,10 @@ func (a *App) Run() error {
 	// Build root container
 	root := container.New()
 
+	// Register logger as a provider for injection
+	loggerProvider := Value(a.opts.logger)
+	root.Register(loggerProvider.Type(), container.NewEntry(nil, loggerProvider.Eager(), nil, false, true))
+
 	// Register root-level providers
 	for _, p := range a.providers {
 		a.registerProvider(root, p)

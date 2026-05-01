@@ -9,6 +9,10 @@ Welcome to the Ligo documentation. Ligo is a modular Go framework with lightweig
 - [Providers](providers.md) - Dependency injection with providers
 - [Controllers](controllers.md) - Handling HTTP requests
 - [Middleware](middleware.md) - Global, module-level, and route-level middleware
+- [Guards](guards.md) - Authorization with guards
+- [Pipes](pipes.md) - Validation and transformation with pipes
+- [Interceptors](interceptors.md) - Logging, caching, and transformation with interceptors
+- [Exception Filters](exception-filters.md) - Error handling and HTTP response conversion
 - [DI Container](di-container.md) - How the DI container works
 
 ## Quick Reference
