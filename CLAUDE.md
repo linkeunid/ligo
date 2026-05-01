@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Note**: This is internal documentation for AI assistance. For user-facing documentation, see [README.md](README.md).
+
 ## Project Overview
 
 **Ligo** is a modular Go framework with lightweight dependency injection, inspired by NestJS.
@@ -47,17 +49,18 @@ ligo/
 ├── options.go              # App options: WithRouter, WithAddr, WithMiddleware, WithLogger, OnStart, OnStop
 ├── errors.go               # Error types: ErrAppAlreadyStarted, ErrMissingDependency, ErrCircularDependency, etc.
 ├── adapters/
-│   └── echo/router.go      # Echo v5 adapter implementation
+│   └── echo/router.go      # Echo v5 adapter implementation with middleware chaining
 ├── internal/
 │   ├── core/
 │   │   ├── container/      # DI container with thread-safe singletons and cycle detection
 │   │   ├── module/         # Module definition with Middlewares support
 │   │   ├── lifecycle/      # App lifecycle management
+│   │   ├── logger/         # NestJS-style logger with context levels
 │   │   └── resolver/       # Interface-based dependency resolution
 │   ├── http/
-│   │   ├── router.go      # Router interface
+│   │   ├── router.go      # Router interface + SetLoggerRouter for logging integration
 │   │   ├── context.go     # Context interface (with Set/Get for request-scoped data)
-│   │   └── binder.go      # Controller registration with DI
+│   │   └── binder.go      # Controller registration with DI and middleware resolution
 │   └── testing/
 │       └── app.go         # Test helpers: NewTestApp, NewTestContainer, NewTestAppWithOverrides
 └── examples/
@@ -134,3 +137,6 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - HTTP abstractions in `internal/http/` are adapter-agnostic
 - Module middleware is resolved via DI and applied per module group
 - Request-scoped data via `ctx.Set(key, val)` / `ctx.Get(key)`
+- Logger uses NestJS-style context levels (ContextApp, ContextDIContainer, ContextRoutes, ContextLifecycle)
+- Middleware chaining is applied in reverse order (last middleware wraps first)
+- Echo adapter's `wrapHandlerWithMiddleware` is shared between Adapter and groupAdapter
