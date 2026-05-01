@@ -165,14 +165,14 @@ func (a *App) buildModule(parent *container.Container, mod module.Module, log Lo
 		}
 		if provider.IsExported() {
 			a.registerProvider(parent, provider) // exported to root
-			if name != "unknown" && log != nil {
-				log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
-			}
+			// if name != "unknown" && log != nil {
+			// 	log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+			// }
 		} else {
 			a.registerProvider(modContainer, provider)
-			if name != "unknown" && log != nil {
-				log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
-			}
+			// if name != "unknown" && log != nil {
+			// 	log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+			// }
 		}
 	}
 
