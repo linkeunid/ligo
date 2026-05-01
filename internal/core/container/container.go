@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
 // Container holds registered providers and resolves dependencies.
@@ -12,6 +14,7 @@ type Container struct {
 	providers map[reflect.Type]ProviderEntry
 	cache     sync.Map // map[reflect.Type]any — thread-safe cache
 	locks     sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
+	logger    logger.Logger
 }
 
 // ProviderEntry represents a registered provider in the container.
@@ -24,10 +27,14 @@ type ProviderEntry struct {
 }
 
 // New creates a new DI container.
-func New() *Container {
-	return &Container{
+func New(log ...logger.Logger) *Container {
+	c := &Container{
 		providers: make(map[reflect.Type]ProviderEntry),
 	}
+	if len(log) > 0 {
+		c.logger = log[0]
+	}
+	return c
 }
 
 // Types returns all registered types in the container.
@@ -49,6 +56,22 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 		panic(&ErrDuplicateProvider{Type: typ.String()})
 	}
 	c.providers[typ] = entry
+
+	// Log provider registration
+	if c.logger != nil {
+		name := logger.ExtractProviderName(entry.eager)
+		if name == "" && entry.factory != nil {
+			fnTyp := reflect.TypeOf(entry.factory)
+			if fnTyp.NumOut() > 0 {
+				retTyp := fnTyp.Out(0)
+				if retTyp.Kind() == reflect.Ptr {
+					retTyp = retTyp.Elem()
+				}
+				name = retTyp.Name()
+			}
+		}
+		c.logger.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+	}
 }
 
 // Resolve returns an instance of type T from the container.

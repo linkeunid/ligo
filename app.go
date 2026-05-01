@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 	"github.com/linkeunid/ligo/internal/http"
 )
@@ -65,6 +66,8 @@ func (a *App) Run() error {
 	a.started = true
 	a.mu.Unlock()
 
+	a.opts.logger.Info("Starting ligo application", logger.Field{Key: "context", Value: logger.ContextApp})
+
 	// Build root container
 	root := container.New()
 
@@ -73,17 +76,23 @@ func (a *App) Run() error {
 		a.registerProvider(root, p)
 	}
 
-	// Build module graph
+	// Build module graph and log dependencies
 	for _, mod := range a.modules {
-		a.buildModule(root, mod)
+		a.buildModule(root, mod, a.opts.logger)
+		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
 	}
 
 	a.container = root
 
 	// Register controllers if router is configured
 	if a.opts.router != nil {
+		// Set logger on router if it supports it
+		if echoAdapter, ok := a.opts.router.(interface{ SetLogger(logger.Logger) }); ok {
+			echoAdapter.SetLogger(a.opts.logger)
+		}
+
 		// Build binder
-		binder := http.NewBinder(a.container, a.opts.router)
+		binder := http.NewBinder(a.container, a.opts.router, a.opts.logger)
 
 		// Apply global middleware
 		for _, mw := range a.opts.middlewares {
@@ -94,10 +103,16 @@ func (a *App) Run() error {
 		if err := binder.BindControllers(a.modules); err != nil {
 			return err
 		}
-
-		return a.opts.router.Serve(a.opts.addr)
 	}
 
+	a.opts.logger.Info("Ligo application started",
+		logger.Field{Key: "context", Value: logger.ContextApp},
+		logger.Field{Key: "addr", Value: a.opts.addr},
+	)
+
+	if a.opts.router != nil {
+		return a.opts.router.Serve(a.opts.addr)
+	}
 	return nil
 }
 
@@ -138,22 +153,31 @@ func (a *App) buildProviderEntry(p Provider) container.ProviderEntry {
 	}, nil, argTypes, p.transient, p.exported)
 }
 
-func (a *App) buildModule(parent *container.Container, mod module.Module) {
-	// Create module container with parent
+func (a *App) buildModule(parent *container.Container, mod module.Module, log Logger) {
 	modContainer := parent // flat graph - modules share root container
 
 	// Register module providers
 	for _, p := range mod.Providers {
 		provider := p.(Provider)
+		name := logger.ExtractProviderName(provider.Fn())
+		if name == "unknown" && provider.Eager() != nil {
+			name = logger.ExtractProviderName(provider.Eager())
+		}
 		if provider.IsExported() {
 			a.registerProvider(parent, provider) // exported to root
+			if name != "unknown" && log != nil {
+				log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+			}
 		} else {
 			a.registerProvider(modContainer, provider)
+			if name != "unknown" && log != nil {
+				log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+			}
 		}
 	}
 
 	// Build child modules
 	for _, child := range mod.Imports {
-		a.buildModule(parent, child)
+		a.buildModule(parent, child, log)
 	}
 }

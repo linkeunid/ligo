@@ -1,30 +1,43 @@
 package echo
 
 import (
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 
 	echo "github.com/labstack/echo/v5"
 	httpifc "github.com/linkeunid/ligo/internal/http"
+	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
 // Adapter implements httpifc.Router using Echo v5.
 type Adapter struct {
 	e          *echo.Echo
 	middleware []httpifc.Middleware
+	logger     logger.Logger
 }
 
 // NewAdapter creates a new Echo v5 adapter.
 func NewAdapter() *Adapter {
+	e := echo.New()
+	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil)) // Suppress Echo's default logs
 	return &Adapter{
-		e: echo.New(),
+		e: e,
 	}
+}
+
+// SetLogger sets the logger for route mapping logs.
+func (a *Adapter) SetLogger(log logger.Logger) {
+	a.logger = log
 }
 
 // Group creates a sub-router with a prefix.
 func (a *Adapter) Group(prefix string) httpifc.Router {
 	return &groupAdapter{
-		g:         a.e.Group(prefix),
+		g:          a.e.Group(prefix),
 		middleware: a.middleware, // inherit global middleware
+		logger:     a.logger,
 	}
 }
 
@@ -36,6 +49,10 @@ func (a *Adapter) Use(mw ...httpifc.Middleware) {
 // Handle registers a route with middleware chain.
 func (a *Adapter) Handle(method, path string, handler httpifc.HandlerFunc) {
 	a.e.Add(method, path, a.wrapHandler(handler))
+
+	if a.logger != nil {
+		a.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("Mapped {%s, %s} route", method, path))
+	}
 }
 
 // wrapHandler applies middleware chain to handler.
@@ -57,12 +74,14 @@ func (a *Adapter) Serve(addr string) error {
 type groupAdapter struct {
 	g          *echo.Group
 	middleware []httpifc.Middleware
+	logger     logger.Logger
 }
 
 func (g *groupAdapter) Group(prefix string) httpifc.Router {
 	return &groupAdapter{
 		g:          g.g.Group(prefix),
 		middleware: g.middleware,
+		logger:     g.logger,
 	}
 }
 
@@ -72,6 +91,10 @@ func (g *groupAdapter) Use(mw ...httpifc.Middleware) {
 
 func (g *groupAdapter) Handle(method, path string, handler httpifc.HandlerFunc) {
 	g.g.Add(method, path, g.wrapHandler(handler))
+
+	if g.logger != nil {
+		g.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("Mapped {%s, %s} route", method, path))
+	}
 }
 
 func (g *groupAdapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {

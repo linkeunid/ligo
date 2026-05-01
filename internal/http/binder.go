@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 )
 
@@ -12,13 +13,15 @@ import (
 type Binder struct {
 	container *container.Container
 	router    Router
+	logger    logger.Logger
 }
 
 // NewBinder creates a new binder instance.
-func NewBinder(c *container.Container, r Router) *Binder {
+func NewBinder(c *container.Container, r Router, log logger.Logger) *Binder {
 	return &Binder{
 		container: c,
 		router:    r,
+		logger:    log,
 	}
 }
 
@@ -51,14 +54,14 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 		}
 		// Bind controllers to module-scoped router
 		for _, cc := range mod.Controllers {
-			if err := b.bindControllerTo(cc, moduleRouter); err != nil {
+			if err := b.bindControllerTo(cc, moduleRouter, mod.Name); err != nil {
 				return err
 			}
 		}
 	} else {
 		// No module middleware, bind to root router
 		for _, cc := range mod.Controllers {
-			if err := b.bindController(cc); err != nil {
+			if err := b.bindController(cc, mod.Name); err != nil {
 				return err
 			}
 		}
@@ -102,7 +105,7 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware,
 	return mw, nil
 }
 
-func (b *Binder) bindController(cc module.ControllerConstructor) error {
+func (b *Binder) bindController(cc module.ControllerConstructor, modName string) error {
 	fnValue := reflect.ValueOf(cc.Fn)
 	fnType := fnValue.Type()
 
@@ -137,10 +140,22 @@ func (b *Binder) bindController(cc module.ControllerConstructor) error {
 	if ctrl != nil {
 		ctrl.Routes(b.router)
 	}
+
+	// Log controller registration
+	if b.logger != nil {
+		ctrlName := b.extractControllerName(cc)
+		if ctrlName == "" {
+			ctrlName = "controller"
+		}
+		b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
+			logger.Field{Key: "module", Value: modName},
+		)
+	}
+
 	return nil
 }
 
-func (b *Binder) bindControllerTo(cc module.ControllerConstructor, r Router) error {
+func (b *Binder) bindControllerTo(cc module.ControllerConstructor, r Router, modName string) error {
 	fnValue := reflect.ValueOf(cc.Fn)
 	fnType := fnValue.Type()
 
@@ -175,5 +190,43 @@ func (b *Binder) bindControllerTo(cc module.ControllerConstructor, r Router) err
 	if ctrl != nil {
 		ctrl.Routes(r)
 	}
+
+	// Log controller registration
+	if b.logger != nil {
+		ctrlName := b.extractControllerName(cc)
+		if ctrlName == "" {
+			ctrlName = "controller"
+		}
+		b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
+			logger.Field{Key: "module", Value: modName},
+		)
+	}
+
 	return nil
+}
+
+// extractControllerName extracts the controller name from the constructor.
+func (b *Binder) extractControllerName(cc module.ControllerConstructor) string {
+	fnType := reflect.TypeOf(cc.Fn)
+	if fnType.Kind() != reflect.Func {
+		return "Controller"
+	}
+
+	// Try to get name from return type
+	if fnType.NumOut() > 0 {
+		retTyp := fnType.Out(0)
+		if retTyp.Kind() == reflect.Ptr {
+			retTyp = retTyp.Elem()
+		}
+		if retTyp.Name() != "" && retTyp.Name() != "Controller" {
+			return retTyp.Name()
+		}
+	}
+
+	// Fallback: extract from function name (NewUserController -> UserController)
+	fnName := fnType.Name()
+	if len(fnName) > 3 && fnName[:3] == "New" {
+		return fnName[3:]
+	}
+	return fnName
 }

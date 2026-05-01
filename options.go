@@ -1,5 +1,9 @@
 package ligo
 
+import (
+	"github.com/linkeunid/ligo/internal/core/logger"
+)
+
 type options struct {
 	router      Router
 	addr        string
@@ -11,9 +15,45 @@ type options struct {
 }
 
 // Logger is the interface for framework logging.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
+type Logger = logger.Logger
+
+// LoggerType represents the logger output format.
+type LoggerType = logger.Type
+
+const (
+	LoggerText = logger.TypeText
+	LoggerJSON = logger.TypeJSON
+)
+
+// LoggerField is a key-value pair for structured logging.
+type LoggerField = logger.Field
+
+// NewLogger creates a new logger. Default is text mode for development.
+func NewLogger(opts ...LoggerOption) Logger {
+	return logger.New(opts...)
+}
+
+// LoggerOption configures the logger.
+type LoggerOption = logger.LoggerOption
+
+// WithLoggerText sets text output format.
+func WithLoggerText() LoggerOption {
+	return logger.WithText()
+}
+
+// WithLoggerJSON sets JSON output format.
+func WithLoggerJSON() LoggerOption {
+	return logger.WithJSON()
+}
+
+// WithLoggerProduction enables JSON logging.
+func WithLoggerProduction() LoggerOption {
+	return logger.WithProduction()
+}
+
+// WithLoggerDebug enables debug logging.
+func WithLoggerDebug() LoggerOption {
+	return logger.WithDebug(true)
 }
 
 // LifecycleHook is a function called during app lifecycle events.
@@ -25,6 +65,7 @@ type Option func(*options)
 func defaultOptions() options {
 	return options{
 		addr: ":8080",
+		logger: logger.New(),
 	}
 }
 
@@ -46,6 +87,14 @@ func WithAddr(addr string) Option {
 func WithDebug(debug bool) Option {
 	return func(o *options) {
 		o.debug = debug
+		o.logger.SetDebug(debug)
+	}
+}
+
+// WithJSON enables JSON logging mode (production).
+func WithJSON() Option {
+	return func(o *options) {
+		o.logger = logger.New(logger.WithJSON())
 	}
 }
 
