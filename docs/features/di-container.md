@@ -1,0 +1,123 @@
+# DI Container
+
+The dependency injection container manages provider registration and dependency resolution.
+
+## Features
+
+- **Thread-safe singleton creation** - Per-type locks via `sync.Map`
+- **Transient providers** - New instance per resolve
+- **Cycle detection** - Chain-based detection prevents deadlock
+- **Auto-injection** - Dependencies resolved via reflection
+- **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`
+
+## How It Works
+
+### Registration
+
+Providers are registered with their type:
+
+```go
+container := container.New()
+
+container.Register(reflect.TypeOf(&UserService{}), container.ProviderEntry{
+    Factory: func(args []reflect.Value) (any, error) {
+        return &UserService{}, nil
+    },
+    ArgTypes: []reflect.Type{
+        reflect.TypeOf(&UserRepo{}), // Dependencies
+    },
+})
+```
+
+### Resolution
+
+When resolving a dependency:
+1. Check if already instantiated (singleton)
+2. Check for circular dependencies
+3. Resolve dependencies recursively
+4. Create and cache instance
+
+## Error Types
+
+### ErrMissingDependency
+
+Thrown when a dependency cannot be found:
+
+```go
+// If *UserRepo is not registered
+ligo.Factory[*UserService](NewUserService)
+// Error: missing dependency *UserRepo
+```
+
+### ErrCircularDependency
+
+Thrown when dependencies form a cycle:
+
+```go
+// A depends on B, B depends on A
+ligo.Factory[*A](func(b *B) *A { return &A{b} })
+ligo.Factory[*B](func(a *A) *B { return &B{a} })
+// Error: circular dependency detected
+```
+
+### ErrDuplicateProvider
+
+Thrown when registering the same type twice:
+
+```go
+ligo.Factory[*UserService](NewUserService1)
+ligo.Factory[*UserService](NewUserService2)
+// Error: duplicate provider for *UserService
+```
+
+## Thread Safety
+
+The container uses `sync.Map` for per-type locking, allowing concurrent resolution:
+
+```go
+// Safe to call from multiple goroutines
+go func() {
+    svc := container.Resolve[*UserService]()
+}()
+
+go func() {
+    svc := container.Resolve[*UserService]()
+}()
+```
+
+## Singleton vs Transient
+
+### Singleton (Default)
+
+```go
+ligo.Factory[*UserService](NewUserService)
+
+// Always returns the same instance
+svc1 := Resolve[*UserService]()
+svc2 := Resolve[*UserService]()
+// svc1 == svc2
+```
+
+### Transient
+
+```go
+ligo.Transient[*UserService](NewUserService)
+
+// Returns a new instance each time
+svc1 := Resolve[*UserService]()
+svc2 := Resolve[*UserService]()
+// svc1 != svc2
+```
+
+## Advanced: Manual Container Access
+
+For advanced use cases, access the container after `Run()`:
+
+```go
+app.Run()
+
+container := app.Container()
+userService := container.Resolve[*UserService]()
+```
+
+> **Warning**: This is an "escape hatch" for advanced scenarios. Prefer using DI through constructors.

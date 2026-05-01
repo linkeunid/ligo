@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Module**: `github.com/linkeunid/ligo`
 - **Go version**: 1.25.9
 - **License**: MIT
+- **Documentation**: [README.md](../README.md) (user-facing), [docs/features/](../docs/features/) (detailed)
 
 ## Commands
 
