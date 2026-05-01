@@ -82,7 +82,7 @@ func (a *App) Run() error {
 
 	// Build module graph and log dependencies
 	for _, mod := range a.modules {
-		a.buildModule(root, mod, a.opts.logger)
+		a.buildModule(root, mod)
 		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
 	}
 
@@ -136,6 +136,7 @@ func (a *App) Container() *container.Container {
 func (a *App) runWithGracefulShutdown() error {
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(shutdownChan)
 
 	errChan := make(chan error, 1)
 
@@ -195,16 +196,12 @@ func (a *App) buildProviderEntry(p Provider) container.ProviderEntry {
 	}, nil, argTypes, p.transient, p.exported)
 }
 
-func (a *App) buildModule(parent *container.Container, mod module.Module, log Logger) {
+func (a *App) buildModule(parent *container.Container, mod module.Module) {
 	modContainer := parent // flat graph - modules share root container
 
 	// Register module providers
 	for _, p := range mod.Providers {
 		provider := p.(Provider)
-		name := logger.ExtractProviderName(provider.Fn())
-		if name == "unknown" && provider.Eager() != nil {
-			name = logger.ExtractProviderName(provider.Eager())
-		}
 		if provider.IsExported() {
 			a.registerProvider(parent, provider)
 		} else {
@@ -214,6 +211,6 @@ func (a *App) buildModule(parent *container.Container, mod module.Module, log Lo
 
 	// Build child modules
 	for _, child := range mod.Imports {
-		a.buildModule(parent, child, log)
+		a.buildModule(parent, child)
 	}
 }

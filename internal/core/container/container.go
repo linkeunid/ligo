@@ -60,15 +60,8 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	// Log provider registration
 	if c.logger != nil {
 		name := logger.ExtractProviderName(entry.eager)
-		if name == "" && entry.factory != nil {
-			fnTyp := reflect.TypeOf(entry.factory)
-			if fnTyp.NumOut() > 0 {
-				retTyp := fnTyp.Out(0)
-				if retTyp.Kind() == reflect.Ptr {
-					retTyp = retTyp.Elem()
-				}
-				name = retTyp.Name()
-			}
+		if name == "unknown" && entry.factory != nil {
+			name = logger.ExtractProviderName(entry.factory)
 		}
 		c.logger.Debug("Provider registered", logger.Field{Key: "name", Value: name})
 	}
