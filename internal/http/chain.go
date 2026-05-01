@@ -38,29 +38,29 @@ func (cr *chainRouter) Serve(addr string) error {
 }
 
 func (cr *chainRouter) GET(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "GET", path)
+	return newRouteBuilder(cr.router, "GET", path, handlers...)
 }
 
 func (cr *chainRouter) POST(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "POST", path)
+	return newRouteBuilder(cr.router, "POST", path, handlers...)
 }
 
 func (cr *chainRouter) PUT(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "PUT", path)
+	return newRouteBuilder(cr.router, "PUT", path, handlers...)
 }
 
 func (cr *chainRouter) DELETE(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "DELETE", path)
+	return newRouteBuilder(cr.router, "DELETE", path, handlers...)
 }
 
 func (cr *chainRouter) PATCH(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "PATCH", path)
+	return newRouteBuilder(cr.router, "PATCH", path, handlers...)
 }
 
 func (cr *chainRouter) OPTIONS(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "OPTIONS", path)
+	return newRouteBuilder(cr.router, "OPTIONS", path, handlers...)
 }
 
 func (cr *chainRouter) HEAD(path string, handlers ...HandlerFunc) RouteBuilder {
-	return NewRouteBuilder(cr.router, "HEAD", path)
+	return newRouteBuilder(cr.router, "HEAD", path, handlers...)
 }

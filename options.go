@@ -16,6 +16,7 @@ type options struct {
 	gracefulTimeout    time.Duration
 	onStart            []LifecycleHook
 	onStop             []LifecycleHook
+	autoPort           bool
 }
 
 // Logger is the interface for framework logging.
@@ -136,5 +137,12 @@ func WithGracefulShutdown(timeout time.Duration) Option {
 	return func(o *options) {
 		o.gracefulShutdown = true
 		o.gracefulTimeout = timeout
+	}
+}
+
+// WithAutoPort enables automatic port increment if the default port is already in use.
+func WithAutoPort() Option {
+	return func(o *options) {
+		o.autoPort = true
 	}
 }

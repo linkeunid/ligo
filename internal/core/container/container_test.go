@@ -173,15 +173,16 @@ func TestCircularDependency(t *testing.T) {
 func TestDuplicateProvider(t *testing.T) {
 	c := New()
 
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{}, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "first"}, nil, false, false))
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic on duplicate provider")
-		}
-	}()
+	// Duplicate provider should be ignored (no panic)
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "second"}, nil, false, false))
 
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{}, nil, false, false))
+	// Verify the first provider is still used
+	svc := Resolve[*testService](c)
+	if svc.name != "first" {
+		t.Fatalf("expected first provider to be used, got %s", svc.name)
+	}
 }
 
 // TestConcurrentResolve verifies thread-safe singleton creation.

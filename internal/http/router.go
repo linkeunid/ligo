@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 
+	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
@@ -21,7 +22,7 @@ type RouteBuilder interface {
 	Intercept(interceptors ...Interceptor) RouteBuilder
 	Use(middleware ...Middleware) RouteBuilder
 	Filter(filters ...ExceptionFilter) RouteBuilder
-	Handle(handler HandlerFunc)
+	Handle(handler ...HandlerFunc)
 }
 
 // Guard determines if a request should proceed (authorization).
@@ -40,6 +41,12 @@ type ExceptionFilter func(error, Context) error
 type SetLoggerRouter interface {
 	Router
 	SetLogger(logger.Logger)
+}
+
+// SetContainerRouter extends Router with DI container support for request-scoped DI.
+type SetContainerRouter interface {
+	Router
+	SetContainer(*container.Container)
 }
 
 // GracefulServer extends Router with graceful shutdown capability.

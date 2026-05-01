@@ -9,8 +9,11 @@ import (
 
 	echo "github.com/labstack/echo/v5"
 	httpifc "github.com/linkeunid/ligo/internal/http"
+	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
+
+const errorMsgKey = "error"
 
 // Adapter implements httpifc.Router using Echo v5.
 type Adapter struct {
@@ -18,6 +21,7 @@ type Adapter struct {
 	middleware []httpifc.Middleware
 	logger     logger.Logger
 	server     *http.Server
+	container  *container.Container
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -25,7 +29,17 @@ func NewAdapter() *Adapter {
 	e := echo.New()
 	e.Logger = slog.New(slog.NewTextHandler(io.Discard, nil)) // Suppress Echo's default logs
 	return &Adapter{
-		e: e,
+		e:         e,
+		container: nil, // Will be set by SetContainer
+	}
+}
+
+// SetContainer sets the root DI container for request-scoped DI.
+func (a *Adapter) SetContainer(c *container.Container) {
+	a.container = c
+	// Add request scope middleware if container is set
+	if c != nil {
+		a.middleware = append([]httpifc.Middleware{a.requestScopeMiddleware()}, a.middleware...)
 	}
 }
 
@@ -76,6 +90,17 @@ func (a *Adapter) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// requestScopeMiddleware creates a per-request child container and sets it on the context.
+func (a *Adapter) requestScopeMiddleware() httpifc.Middleware {
+	return func(next httpifc.HandlerFunc) httpifc.HandlerFunc {
+		return func(ctx httpifc.Context) error {
+			child := a.container.NewChild()
+			ctx.SetRequestContainer(child)
+			return next(ctx)
+		}
+	}
+}
+
 type groupAdapter struct {
 	g          *echo.Group
 	middleware []httpifc.Middleware
@@ -122,8 +147,9 @@ func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.
 }
 
 type contextAdapter struct {
-	c      *echo.Context
-	values map[string]any
+	c         *echo.Context
+	values    map[string]any
+	reqCont   *container.Container
 }
 
 func newContextAdapter(c *echo.Context) *contextAdapter {
@@ -163,4 +189,54 @@ func (ca *contextAdapter) Set(key string, val any) {
 
 func (ca *contextAdapter) Get(key string) any {
 	return ca.values[key]
+}
+
+func (ca *contextAdapter) SetRequestContainer(c *container.Container) {
+	ca.reqCont = c
+}
+
+func (ca *contextAdapter) GetRequestContainer() *container.Container {
+	return ca.reqCont
+}
+
+// HTTP response helpers
+
+func (ca *contextAdapter) errorResponse(code int, msg string) error {
+	return ca.c.JSON(code, map[string]string{errorMsgKey: msg})
+}
+
+func (ca *contextAdapter) OK(v any) error {
+	return ca.c.JSON(http.StatusOK, v)
+}
+
+func (ca *contextAdapter) Created(v any) error {
+	return ca.c.JSON(http.StatusCreated, v)
+}
+
+func (ca *contextAdapter) NoContent() error {
+	return ca.c.String(http.StatusNoContent, "")
+}
+
+func (ca *contextAdapter) BadRequest(msg string) error {
+	return ca.errorResponse(http.StatusBadRequest, msg)
+}
+
+func (ca *contextAdapter) Unauthorized(msg string) error {
+	return ca.errorResponse(http.StatusUnauthorized, msg)
+}
+
+func (ca *contextAdapter) Forbidden(msg string) error {
+	return ca.errorResponse(http.StatusForbidden, msg)
+}
+
+func (ca *contextAdapter) NotFound(msg string) error {
+	return ca.errorResponse(http.StatusNotFound, msg)
+}
+
+func (ca *contextAdapter) Conflict(msg string) error {
+	return ca.errorResponse(http.StatusConflict, msg)
+}
+
+func (ca *contextAdapter) InternalServerError(msg string) error {
+	return ca.errorResponse(http.StatusInternalServerError, msg)
 }

@@ -8,6 +8,7 @@ type routeBuilder struct {
 	router           Router
 	method           string
 	path             string
+	handler          HandlerFunc
 	guards           []Guard
 	pipes            []Pipe
 	interceptors     []Interceptor
@@ -21,6 +22,20 @@ func NewRouteBuilder(router Router, method, path string) RouteBuilder {
 		router: router,
 		method: method,
 		path:   path,
+	}
+}
+
+// newRouteBuilder creates a route builder with an optional handler.
+func newRouteBuilder(router Router, method, path string, handlers ...HandlerFunc) RouteBuilder {
+	var h HandlerFunc
+	if len(handlers) > 0 {
+		h = handlers[0]
+	}
+	return &routeBuilder{
+		router:  router,
+		method:  method,
+		path:    path,
+		handler: h,
 	}
 }
 
@@ -49,8 +64,15 @@ func (rb *routeBuilder) Filter(filters ...ExceptionFilter) RouteBuilder {
 	return rb
 }
 
-func (rb *routeBuilder) Handle(handler HandlerFunc) {
-	wrapped := handler
+func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
+	h := rb.handler
+	if len(handler) > 0 {
+		h = handler[0]
+	}
+	if h == nil {
+		return // No handler to register
+	}
+	wrapped := h
 
 	// Apply interceptors (wrap the entire cycle)
 	for i := len(rb.interceptors) - 1; i >= 0; i-- {
@@ -65,20 +87,14 @@ func (rb *routeBuilder) Handle(handler HandlerFunc) {
 	if len(rb.pipes) > 0 {
 		prev := wrapped
 		wrapped = func(ctx Context) error {
-			// Apply pipes to request body if present
-			if ctx.Request().Body != nil {
-				body, err := ctx.Request().GetBody()
-				if err == nil {
-					value := any(body)
-					for _, pipe := range rb.pipes {
-						transformed, err := pipe(value)
-						if err != nil {
-							return fmt.Errorf("pipe error: %w", err)
-						}
-						value = transformed
-					}
-					// Store transformed value in context
-					ctx.Set("pipe:result", value)
+			// Pipes validate/transform request body
+			// Store bound data in context for pipes to access
+			for _, pipe := range rb.pipes {
+				// Get the bound data from context (if already bound)
+				// Otherwise, pipe will run with nil input
+				boundData := ctx.Get("_ligo_bound_data")
+				if _, err := pipe(boundData); err != nil {
+					return fmt.Errorf("pipe error: %w", err)
 				}
 			}
 			return prev(ctx)

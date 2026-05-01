@@ -29,3 +29,20 @@ func Controllers(constructors ...any) module.ModuleOption {
 func Middlewares(constructors ...any) module.ModuleOption {
 	return module.Middlewares(constructors...)
 }
+
+// OnModuleInit adds a hook to run when the module is initialized.
+func OnModuleInit(fn func() error) module.ModuleOption {
+	return module.OnModuleInit(fn)
+}
+
+// OnModuleDestroy adds a hook to run when the module is destroyed.
+func OnModuleDestroy(fn func() error) module.ModuleOption {
+	return module.OnModuleDestroy(fn)
+}
+
+// Dynamic creates a module option for dynamic modules with configuration options.
+// The factory function receives the options and returns a configured module.
+// Usage: ligo.Dynamic(NewConfigModule, folder)
+func Dynamic(factory func(...any) module.Module, opts ...any) module.ModuleOption {
+	return module.Dynamic(factory, opts...)
+}

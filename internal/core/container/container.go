@@ -11,6 +11,7 @@ import (
 // Container holds registered providers and resolves dependencies.
 type Container struct {
 	mu        sync.RWMutex
+	parent    *Container
 	providers map[reflect.Type]ProviderEntry
 	cache     sync.Map // map[reflect.Type]any — thread-safe cache
 	locks     sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
@@ -37,6 +38,19 @@ func New(log ...logger.Logger) *Container {
 	return c
 }
 
+// NewChild creates a child container that inherits providers from this container.
+// Child containers can override parent providers and have their own cache.
+func (c *Container) NewChild() *Container {
+	child := &Container{
+		parent:    c,
+		providers: make(map[reflect.Type]ProviderEntry),
+	}
+	if c.logger != nil {
+		child.logger = c.logger
+	}
+	return child
+}
+
 // Types returns all registered types in the container.
 func (c *Container) Types() []reflect.Type {
 	c.mu.RLock()
@@ -49,11 +63,16 @@ func (c *Container) Types() []reflect.Type {
 }
 
 // Register adds a provider to the container.
+// If a provider for the type already exists, it is ignored and a warning is logged.
 func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, exists := c.providers[typ]; exists {
-		panic(&ErrDuplicateProvider{Type: typ.String()})
+		// Duplicate provider - ignore and warn
+		if c.logger != nil {
+			c.logger.Warn("Duplicate provider ignored, using existing registration", logger.Field{Key: "type", Value: typ.String()})
+		}
+		return
 	}
 	c.providers[typ] = entry
 
@@ -104,6 +123,11 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 	c.mu.RLock()
 	entry, ok := c.providers[typ]
 	c.mu.RUnlock()
+
+	// If not found in this container, check parent
+	if !ok && c.parent != nil {
+		return c.parent.resolve(typ, chain)
+	}
 
 	if !ok {
 		return nil, fmt.Errorf("ligo: missing dependency %s", typ.String())

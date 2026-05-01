@@ -1,5 +1,11 @@
 package module
 
+// DynamicModule wraps a module factory with options.
+type DynamicModule struct {
+	Factory func(...any) Module
+	Options []any
+}
+
 // Module represents a self-contained unit of functionality.
 type Module struct {
 	Name        string
@@ -7,6 +13,9 @@ type Module struct {
 	Controllers []ControllerConstructor
 	Imports     []Module
 	Middlewares []MiddlewareConstructor
+	OnInit      []func() error
+	OnDestroy   []func() error
+	Dynamic     *DynamicModule
 }
 
 // MiddlewareConstructor holds a middleware constructor.
@@ -59,6 +68,32 @@ func Middlewares(constructors ...any) ModuleOption {
 	return func(m *Module) {
 		for _, c := range constructors {
 			m.Middlewares = append(m.Middlewares, MiddlewareConstructor{Fn: c})
+		}
+	}
+}
+
+// OnModuleInit adds a hook to run when the module is initialized.
+func OnModuleInit(fn func() error) ModuleOption {
+	return func(m *Module) {
+		m.OnInit = append(m.OnInit, fn)
+	}
+}
+
+// OnModuleDestroy adds a hook to run when the module is destroyed.
+func OnModuleDestroy(fn func() error) ModuleOption {
+	return func(m *Module) {
+		m.OnDestroy = append(m.OnDestroy, fn)
+	}
+}
+
+// Dynamic creates a module option for dynamic modules.
+// The factory function receives the options and returns a configured module.
+// Usage: ligo.Dynamic(NewConfigModule, folder)
+func Dynamic(factory func(...any) Module, opts ...any) ModuleOption {
+	return func(m *Module) {
+		m.Dynamic = &DynamicModule{
+			Factory: factory,
+			Options: opts,
 		}
 	}
 }

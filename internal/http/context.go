@@ -1,6 +1,10 @@
 package http
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/linkeunid/ligo/internal/core/container"
+)
 
 // Controller defines how HTTP routes are registered for a module.
 type Controller interface {
@@ -25,4 +29,19 @@ type Context interface {
 	// Request-scoped data storage
 	Set(key string, val any)
 	Get(key string) any
+
+	// Request-scoped DI container
+	SetRequestContainer(c *container.Container)
+	GetRequestContainer() *container.Container
+
+	// HTTP response helpers
+	OK(v any) error
+	Created(v any) error
+	NoContent() error
+	BadRequest(msg string) error
+	Unauthorized(msg string) error
+	Forbidden(msg string) error
+	NotFound(msg string) error
+	Conflict(msg string) error
+	InternalServerError(msg string) error
 }

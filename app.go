@@ -1,13 +1,9 @@
 package ligo
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"reflect"
 	"sync"
-	"syscall"
 
 	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
@@ -17,12 +13,16 @@ import (
 
 // App is the core application instance.
 type App struct {
-	mu        sync.Mutex
-	started   bool
-	modules   []module.Module
-	providers []Provider
-	container *container.Container
-	opts      options
+	mu           sync.Mutex
+	started      bool
+	modules      []module.Module
+	providers    []Provider
+	container    *container.Container
+	moduleHooks  struct {
+		onInit  [][]func() error
+		onDestroy [][]func() error
+	}
+	opts options
 }
 
 // New creates a new Ligo application.
@@ -75,9 +75,9 @@ func (a *App) Run() error {
 	// Build root container
 	root := container.New()
 
-	// Register logger as a provider for injection
-	loggerProvider := Value(a.opts.logger)
-	root.Register(loggerProvider.Type(), container.NewEntry(nil, loggerProvider.Eager(), nil, false, true))
+	// Register logger as a provider for injection (as interface type)
+	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
+	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true))
 
 	// Register root-level providers
 	for _, p := range a.providers {
@@ -92,8 +92,29 @@ func (a *App) Run() error {
 
 	a.container = root
 
+	// Execute OnStart hooks
+	for _, hook := range a.opts.onStart {
+		if err := hook(nil); err != nil {
+			return fmt.Errorf("OnStart hook failed: %w", err)
+		}
+	}
+
+	// Execute OnModuleInit hooks
+	for _, moduleHooks := range a.moduleHooks.onInit {
+		for _, hook := range moduleHooks {
+			if err := hook(); err != nil {
+				return fmt.Errorf("OnModuleInit hook failed: %w", err)
+			}
+		}
+	}
+
 	// Register controllers if router is configured
 	if a.opts.router != nil {
+		// Set container on router for request-scoped DI
+		if sc, ok := a.opts.router.(http.SetContainerRouter); ok {
+			sc.SetContainer(root)
+		}
+
 		// Set logger on router if it supports it
 		if sl, ok := a.opts.router.(http.SetLoggerRouter); ok {
 			sl.SetLogger(a.opts.logger)
@@ -122,6 +143,9 @@ func (a *App) Run() error {
 		if a.opts.gracefulShutdown {
 			return a.runWithGracefulShutdown()
 		}
+		if a.opts.autoPort {
+			return a.serveWithRetry(a.opts.addr)
+		}
 		return a.opts.router.Serve(a.opts.addr)
 	}
 	return nil
@@ -134,87 +158,4 @@ func (a *App) Container() *container.Container {
 		panic("ligo: cannot access container before Run()")
 	}
 	return a.container
-}
-
-// runWithGracefulShutdown runs the server with graceful shutdown on SIGINT/SIGTERM.
-func (a *App) runWithGracefulShutdown() error {
-	shutdownChan := make(chan os.Signal, 1)
-	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(shutdownChan)
-
-	errChan := make(chan error, 1)
-
-	go func() {
-		errChan <- a.opts.router.Serve(a.opts.addr)
-	}()
-
-	select {
-	case <-shutdownChan:
-		a.opts.logger.Info("Shutting down gracefully...", logger.Field{Key: "context", Value: logger.ContextLifecycle})
-
-		ctx, cancel := context.WithTimeout(context.Background(), a.opts.gracefulTimeout)
-		defer cancel()
-
-		for _, hook := range a.opts.onStop {
-			if err := hook(ctx); err != nil {
-				a.opts.logger.Error("OnStop hook failed", logger.Field{Key: "error", Value: err})
-			}
-		}
-
-		if gs, ok := a.opts.router.(http.GracefulServer); ok {
-			if err := gs.Shutdown(ctx); err != nil {
-				return err
-			}
-		}
-		return nil
-	case err := <-errChan:
-		return err
-	}
-}
-
-func (a *App) registerProvider(c *container.Container, p Provider) {
-	entry := a.buildProviderEntry(p)
-	c.Register(p.Type(), entry)
-}
-
-func (a *App) buildProviderEntry(p Provider) container.ProviderEntry {
-	if p.Eager() != nil {
-		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported())
-	}
-
-	// Factory with auto-injection
-	fnValue := reflect.ValueOf(p.fn)
-	fnType := fnValue.Type()
-
-	argTypes := make([]reflect.Type, fnType.NumIn())
-	for i := 0; i < fnType.NumIn(); i++ {
-		argTypes[i] = fnType.In(i)
-	}
-
-	return container.NewEntry(func(args []reflect.Value) (any, error) {
-		out := fnValue.Call(args)
-		if len(out) == 0 {
-			return nil, fmt.Errorf("ligo: factory function must return a value")
-		}
-		return out[0].Interface(), nil
-	}, nil, argTypes, p.transient, p.exported)
-}
-
-func (a *App) buildModule(parent *container.Container, mod module.Module) {
-	modContainer := parent // flat graph - modules share root container
-
-	// Register module providers
-	for _, p := range mod.Providers {
-		provider := p.(Provider)
-		if provider.IsExported() {
-			a.registerProvider(parent, provider)
-		} else {
-			a.registerProvider(modContainer, provider)
-		}
-	}
-
-	// Build child modules
-	for _, child := range mod.Imports {
-		a.buildModule(parent, child)
-	}
 }
