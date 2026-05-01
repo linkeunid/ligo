@@ -52,16 +52,14 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 		for _, mw := range modMw {
 			moduleRouter.Use(mw)
 		}
-		// Bind controllers to module-scoped router
 		for _, cc := range mod.Controllers {
-			if err := b.bindControllerTo(cc, moduleRouter, mod.Name); err != nil {
+			if err := b.bindController(cc, moduleRouter, mod.Name); err != nil {
 				return err
 			}
 		}
 	} else {
-		// No module middleware, bind to root router
 		for _, cc := range mod.Controllers {
-			if err := b.bindController(cc, mod.Name); err != nil {
+			if err := b.bindController(cc, b.router, mod.Name); err != nil {
 				return err
 			}
 		}
@@ -105,7 +103,7 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware,
 	return mw, nil
 }
 
-func (b *Binder) bindController(cc module.ControllerConstructor, modName string) error {
+func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) error {
 	fnValue := reflect.ValueOf(cc.Fn)
 	fnType := fnValue.Type()
 
@@ -138,60 +136,9 @@ func (b *Binder) bindController(cc module.ControllerConstructor, modName string)
 	}
 
 	if ctrl != nil {
-		ctrl.Routes(b.router)
+		ctrl.Routes(router)
 	}
 
-	// Log controller registration
-	if b.logger != nil {
-		ctrlName := b.extractControllerName(cc)
-		if ctrlName == "" {
-			ctrlName = "controller"
-		}
-		b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
-			logger.Field{Key: "module", Value: modName},
-		)
-	}
-
-	return nil
-}
-
-func (b *Binder) bindControllerTo(cc module.ControllerConstructor, r Router, modName string) error {
-	fnValue := reflect.ValueOf(cc.Fn)
-	fnType := fnValue.Type()
-
-	if fnType.Kind() != reflect.Func {
-		return fmt.Errorf("ligo: controller must be a function")
-	}
-
-	argTypes := make([]reflect.Type, fnType.NumIn())
-	for i := 0; i < fnType.NumIn(); i++ {
-		argTypes[i] = fnType.In(i)
-	}
-
-	args := make([]reflect.Value, len(argTypes))
-	for i, argType := range argTypes {
-		resolved := container.ResolveByType(b.container, argType)
-		if resolved == nil {
-			return fmt.Errorf("ligo: missing dependency %s for controller", argType.String())
-		}
-		args[i] = reflect.ValueOf(resolved)
-	}
-
-	out := fnValue.Call(args)
-	if len(out) == 0 {
-		return fmt.Errorf("ligo: controller constructor must return a Controller")
-	}
-
-	ctrl, ok := out[0].Interface().(Controller)
-	if !ok {
-		return fmt.Errorf("ligo: constructor must return Controller")
-	}
-
-	if ctrl != nil {
-		ctrl.Routes(r)
-	}
-
-	// Log controller registration
 	if b.logger != nil {
 		ctrlName := b.extractControllerName(cc)
 		if ctrlName == "" {

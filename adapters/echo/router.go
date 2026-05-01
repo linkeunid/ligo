@@ -122,10 +122,6 @@ func (g *groupAdapter) Serve(addr string) error {
 	return nil
 }
 
-func (g *groupAdapter) Shutdown(ctx context.Context) error {
-	return nil
-}
-
 type contextAdapter struct {
 	c      *echo.Context
 	values map[string]any

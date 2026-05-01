@@ -8,5 +8,10 @@ type Router interface {
 	Use(middleware ...Middleware)
 	Handle(method, path string, handler HandlerFunc)
 	Serve(addr string) error
+}
+
+// GracefulServer extends Router with graceful shutdown capability.
+type GracefulServer interface {
+	Router
 	Shutdown(ctx context.Context) error
 }

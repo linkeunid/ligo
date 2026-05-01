@@ -134,26 +134,32 @@ func (a *App) Container() *container.Container {
 
 // runWithGracefulShutdown runs the server with graceful shutdown on SIGINT/SIGTERM.
 func (a *App) runWithGracefulShutdown() error {
-	// Create channel for shutdown signal
 	shutdownChan := make(chan os.Signal, 1)
 	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Create channel for server error
 	errChan := make(chan error, 1)
 
-	// Start server in goroutine
 	go func() {
 		errChan <- a.opts.router.Serve(a.opts.addr)
 	}()
 
-	// Wait for either shutdown signal or server error
 	select {
 	case <-shutdownChan:
 		a.opts.logger.Info("Shutting down gracefully...", logger.Field{Key: "context", Value: logger.ContextLifecycle})
+
+		for _, hook := range a.opts.onStop {
+			if err := hook(nil); err != nil {
+				a.opts.logger.Error("OnStop hook failed", logger.Field{Key: "error", Value: err})
+			}
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), a.opts.gracefulTimeout)
 		defer cancel()
-		if err := a.opts.router.Shutdown(ctx); err != nil {
-			return err
+
+		if gs, ok := a.opts.router.(interface{ Shutdown(context.Context) error }); ok {
+			if err := gs.Shutdown(ctx); err != nil {
+				return err
+			}
 		}
 		return nil
 	case err := <-errChan:
