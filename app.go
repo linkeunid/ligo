@@ -1,9 +1,13 @@
 package ligo
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 	"sync"
+	"syscall"
 
 	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
@@ -111,6 +115,9 @@ func (a *App) Run() error {
 	)
 
 	if a.opts.router != nil {
+		if a.opts.gracefulShutdown {
+			return a.runWithGracefulShutdown()
+		}
 		return a.opts.router.Serve(a.opts.addr)
 	}
 	return nil
@@ -123,6 +130,35 @@ func (a *App) Container() *container.Container {
 		panic("ligo: cannot access container before Run()")
 	}
 	return a.container
+}
+
+// runWithGracefulShutdown runs the server with graceful shutdown on SIGINT/SIGTERM.
+func (a *App) runWithGracefulShutdown() error {
+	// Create channel for shutdown signal
+	shutdownChan := make(chan os.Signal, 1)
+	signal.Notify(shutdownChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Create channel for server error
+	errChan := make(chan error, 1)
+
+	// Start server in goroutine
+	go func() {
+		errChan <- a.opts.router.Serve(a.opts.addr)
+	}()
+
+	// Wait for either shutdown signal or server error
+	select {
+	case <-shutdownChan:
+		a.opts.logger.Info("Shutting down gracefully...", logger.Field{Key: "context", Value: logger.ContextLifecycle})
+		ctx, cancel := context.WithTimeout(context.Background(), a.opts.gracefulTimeout)
+		defer cancel()
+		if err := a.opts.router.Shutdown(ctx); err != nil {
+			return err
+		}
+		return nil
+	case err := <-errChan:
+		return err
+	}
 }
 
 func (a *App) registerProvider(c *container.Container, p Provider) {

@@ -1,6 +1,7 @@
 package echo
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,6 +17,7 @@ type Adapter struct {
 	e          *echo.Echo
 	middleware []httpifc.Middleware
 	logger     logger.Logger
+	server     *http.Server
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -68,7 +70,16 @@ func (a *Adapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
 
 // Serve starts the HTTP server.
 func (a *Adapter) Serve(addr string) error {
-	return a.e.Start(addr)
+	a.server = &http.Server{Addr: addr, Handler: a.e}
+	return a.server.ListenAndServe()
+}
+
+// Shutdown gracefully shuts down the server.
+func (a *Adapter) Shutdown(ctx context.Context) error {
+	if a.server != nil {
+		return a.server.Shutdown(ctx)
+	}
+	return nil
 }
 
 type groupAdapter struct {
@@ -108,6 +119,10 @@ func (g *groupAdapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc
 }
 
 func (g *groupAdapter) Serve(addr string) error {
+	return nil
+}
+
+func (g *groupAdapter) Shutdown(ctx context.Context) error {
 	return nil
 }
 

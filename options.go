@@ -1,17 +1,21 @@
 package ligo
 
 import (
+	"time"
+
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
 type options struct {
-	router      Router
-	addr        string
-	middlewares []Middleware
-	debug       bool
-	logger      Logger
-	onStart     []LifecycleHook
-	onStop      []LifecycleHook
+	router             Router
+	addr               string
+	middlewares        []Middleware
+	debug              bool
+	logger             Logger
+	gracefulShutdown  bool
+	gracefulTimeout    time.Duration
+	onStart            []LifecycleHook
+	onStop             []LifecycleHook
 }
 
 // Logger is the interface for framework logging.
@@ -66,6 +70,7 @@ func defaultOptions() options {
 	return options{
 		addr: ":8080",
 		logger: logger.New(),
+		gracefulTimeout: 10 * time.Second,
 	}
 }
 
@@ -123,5 +128,13 @@ func OnStart(hook LifecycleHook) Option {
 func OnStop(hook LifecycleHook) Option {
 	return func(o *options) {
 		o.onStop = append(o.onStop, hook)
+	}
+}
+
+// WithGracefulShutdown enables graceful shutdown on SIGINT/SIGTERM.
+func WithGracefulShutdown(timeout time.Duration) Option {
+	return func(o *options) {
+		o.gracefulShutdown = true
+		o.gracefulTimeout = timeout
 	}
 }
