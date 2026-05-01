@@ -147,16 +147,16 @@ func (a *App) runWithGracefulShutdown() error {
 	case <-shutdownChan:
 		a.opts.logger.Info("Shutting down gracefully...", logger.Field{Key: "context", Value: logger.ContextLifecycle})
 
+		ctx, cancel := context.WithTimeout(context.Background(), a.opts.gracefulTimeout)
+		defer cancel()
+
 		for _, hook := range a.opts.onStop {
-			if err := hook(nil); err != nil {
+			if err := hook(ctx); err != nil {
 				a.opts.logger.Error("OnStop hook failed", logger.Field{Key: "error", Value: err})
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), a.opts.gracefulTimeout)
-		defer cancel()
-
-		if gs, ok := a.opts.router.(interface{ Shutdown(context.Context) error }); ok {
+		if gs, ok := a.opts.router.(http.GracefulServer); ok {
 			if err := gs.Shutdown(ctx); err != nil {
 				return err
 			}
@@ -206,15 +206,9 @@ func (a *App) buildModule(parent *container.Container, mod module.Module, log Lo
 			name = logger.ExtractProviderName(provider.Eager())
 		}
 		if provider.IsExported() {
-			a.registerProvider(parent, provider) // exported to root
-			// if name != "unknown" && log != nil {
-			// 	log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
-			// }
+			a.registerProvider(parent, provider)
 		} else {
 			a.registerProvider(modContainer, provider)
-			// if name != "unknown" && log != nil {
-			// 	log.Debug("Provider registered", logger.Field{Key: "name", Value: name})
-			// }
 		}
 	}
 
