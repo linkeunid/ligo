@@ -1,7 +1,5 @@
 package module
 
-import "reflect"
-
 // Module represents a self-contained unit of functionality.
 type Module struct {
 	Name        string
@@ -11,16 +9,14 @@ type Module struct {
 	Middlewares []MiddlewareConstructor
 }
 
-// MiddlewareConstructor holds a middleware constructor with its dependency types.
+// MiddlewareConstructor holds a middleware constructor.
 type MiddlewareConstructor struct {
-	Fn       any
-	ArgTypes []reflect.Type
+	Fn any
 }
 
-// ControllerConstructor holds a controller constructor with its dependency types.
+// ControllerConstructor holds a controller constructor.
 type ControllerConstructor struct {
-	Fn       any
-	ArgTypes []reflect.Type
+	Fn any
 }
 
 // ModuleOption configures a Module.
@@ -53,19 +49,7 @@ func Imports(modules ...Module) ModuleOption {
 func Controllers(constructors ...any) ModuleOption {
 	return func(m *Module) {
 		for _, c := range constructors {
-			fnValue := reflect.ValueOf(c)
-			fnType := fnValue.Type()
-			if fnType.Kind() != reflect.Func {
-				panic("ligo: Controllers expects a function")
-			}
-			argTypes := make([]reflect.Type, fnType.NumIn())
-			for i := 0; i < fnType.NumIn(); i++ {
-				argTypes[i] = fnType.In(i)
-			}
-			m.Controllers = append(m.Controllers, ControllerConstructor{
-				Fn:       c,
-				ArgTypes: argTypes,
-			})
+			m.Controllers = append(m.Controllers, ControllerConstructor{Fn: c})
 		}
 	}
 }
@@ -74,19 +58,7 @@ func Controllers(constructors ...any) ModuleOption {
 func Middlewares(constructors ...any) ModuleOption {
 	return func(m *Module) {
 		for _, c := range constructors {
-			fnValue := reflect.ValueOf(c)
-			fnType := fnValue.Type()
-			if fnType.Kind() != reflect.Func {
-				panic("ligo: Middlewares expects a function")
-			}
-			argTypes := make([]reflect.Type, fnType.NumIn())
-			for i := 0; i < fnType.NumIn(); i++ {
-				argTypes[i] = fnType.In(i)
-			}
-			m.Middlewares = append(m.Middlewares, MiddlewareConstructor{
-				Fn:       c,
-				ArgTypes: argTypes,
-			})
+			m.Middlewares = append(m.Middlewares, MiddlewareConstructor{Fn: c})
 		}
 	}
 }

@@ -68,11 +68,21 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 }
 
 func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware, error) {
-	fnValue := reflect.ValueOf(mc.Fn)
+	return b.resolveConstructor(mc.Fn, "Middleware", func(v reflect.Value) (Middleware, error) {
+		mw, ok := v.Interface().(Middleware)
+		if !ok {
+			return nil, fmt.Errorf("ligo: constructor must return Middleware")
+		}
+		return mw, nil
+	})
+}
+
+func (b *Binder) resolveConstructor(fn any, typeName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
+	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 
 	if fnType.Kind() != reflect.Func {
-		return nil, fmt.Errorf("ligo: middleware must be a function")
+		return nil, fmt.Errorf("ligo: %s must be a function", typeName)
 	}
 
 	argTypes := make([]reflect.Type, fnType.NumIn())
@@ -85,7 +95,7 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware,
 	for i, argType := range argTypes {
 		resolved := container.ResolveByType(b.container, argType)
 		if resolved == nil {
-			return nil, fmt.Errorf("ligo: missing dependency %s for middleware", argType.String())
+			return nil, fmt.Errorf("ligo: missing dependency %s for %s", argType.String(), typeName)
 		}
 		args[i] = reflect.ValueOf(resolved)
 	}
@@ -93,68 +103,41 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware,
 	// Call constructor
 	out := fnValue.Call(args)
 	if len(out) == 0 {
-		return nil, fmt.Errorf("ligo: middleware constructor must return a Middleware")
+		return nil, fmt.Errorf("ligo: %s constructor must return a value", typeName)
 	}
 
-	mw, ok := out[0].Interface().(Middleware)
-	if !ok {
-		return nil, fmt.Errorf("ligo: constructor must return Middleware")
-	}
-	return mw, nil
+	return validate(out[0])
 }
 
 func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) error {
-	fnValue := reflect.ValueOf(cc.Fn)
-	fnType := fnValue.Type()
-
-	if fnType.Kind() != reflect.Func {
-		return fmt.Errorf("ligo: controller must be a function")
-	}
-
-	argTypes := make([]reflect.Type, fnType.NumIn())
-	for i := 0; i < fnType.NumIn(); i++ {
-		argTypes[i] = fnType.In(i)
-	}
-
-	args := make([]reflect.Value, len(argTypes))
-	for i, argType := range argTypes {
-		resolved := container.ResolveByType(b.container, argType)
-		if resolved == nil {
-			return fmt.Errorf("ligo: missing dependency %s for controller", argType.String())
+	_, err := b.resolveConstructor(cc.Fn, "Controller", func(v reflect.Value) (Middleware, error) {
+		ctrl, ok := v.Interface().(Controller)
+		if !ok {
+			return nil, fmt.Errorf("ligo: constructor must return Controller")
 		}
-		args[i] = reflect.ValueOf(resolved)
-	}
 
-	out := fnValue.Call(args)
-	if len(out) == 0 {
-		return fmt.Errorf("ligo: controller constructor must return a Controller")
-	}
-
-	ctrl, ok := out[0].Interface().(Controller)
-	if !ok {
-		return fmt.Errorf("ligo: constructor must return Controller")
-	}
-
-	if ctrl != nil {
-		ctrl.Routes(router)
-	}
-
-	if b.logger != nil {
-		ctrlName := b.extractControllerName(cc)
-		if ctrlName == "" {
-			ctrlName = "controller"
+		if ctrl != nil {
+			ctrl.Routes(router)
 		}
-		b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
-			logger.Field{Key: "module", Value: modName},
-		)
-	}
 
-	return nil
+		if b.logger != nil {
+			ctrlName := b.extractControllerName(cc.Fn)
+			if ctrlName == "" {
+				ctrlName = "controller"
+			}
+			b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
+				logger.Field{Key: "module", Value: modName},
+			)
+		}
+
+		return nil, nil
+	})
+	return err
 }
 
 // extractControllerName extracts the controller name from the constructor.
-func (b *Binder) extractControllerName(cc module.ControllerConstructor) string {
-	fnType := reflect.TypeOf(cc.Fn)
+func (b *Binder) extractControllerName(fn any) string {
+	fnType := reflect.TypeOf(fn)
 	if fnType.Kind() != reflect.Func {
 		return "Controller"
 	}

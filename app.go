@@ -91,8 +91,8 @@ func (a *App) Run() error {
 	// Register controllers if router is configured
 	if a.opts.router != nil {
 		// Set logger on router if it supports it
-		if echoAdapter, ok := a.opts.router.(interface{ SetLogger(logger.Logger) }); ok {
-			echoAdapter.SetLogger(a.opts.logger)
+		if sl, ok := a.opts.router.(http.SetLoggerRouter); ok {
+			sl.SetLogger(a.opts.logger)
 		}
 
 		// Build binder

@@ -59,13 +59,7 @@ func (a *Adapter) Handle(method, path string, handler httpifc.HandlerFunc) {
 
 // wrapHandler applies middleware chain to handler.
 func (a *Adapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
-	wrapped := handler
-	for i := len(a.middleware) - 1; i >= 0; i-- {
-		wrapped = a.middleware[i](wrapped)
-	}
-	return func(c *echo.Context) error {
-		return wrapped(newContextAdapter(c))
-	}
+	return wrapHandlerWithMiddleware(a.middleware, handler)
 }
 
 // Serve starts the HTTP server.
@@ -109,17 +103,22 @@ func (g *groupAdapter) Handle(method, path string, handler httpifc.HandlerFunc) 
 }
 
 func (g *groupAdapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
-	wrapped := handler
-	for i := len(g.middleware) - 1; i >= 0; i-- {
-		wrapped = g.middleware[i](wrapped)
-	}
-	return func(c *echo.Context) error {
-		return wrapped(newContextAdapter(c))
-	}
+	return wrapHandlerWithMiddleware(g.middleware, handler)
 }
 
 func (g *groupAdapter) Serve(addr string) error {
 	return nil
+}
+
+// wrapHandlerWithMiddleware applies middleware chain to handler.
+func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.HandlerFunc) echo.HandlerFunc {
+	wrapped := handler
+	for i := len(middleware) - 1; i >= 0; i-- {
+		wrapped = middleware[i](wrapped)
+	}
+	return func(c *echo.Context) error {
+		return wrapped(newContextAdapter(c))
+	}
 }
 
 type contextAdapter struct {
