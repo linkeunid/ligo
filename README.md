@@ -4,8 +4,8 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-169%20passing-brightgreen)](https://github.com/linkeunid/ligo)
-[![Coverage](https://img.shields.io/badge/coverage-39.8%25-yellow)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Coverage](https://img.shields.io/badge/coverage-48.9%25-yellow)](https://github.com/linkeunid/ligo)
 
 > **Note:** Ligo **v1.0** is ready. All requirements completed including comprehensive documentation, integration tests, performance benchmarks, and stability guarantees.
 
@@ -46,9 +46,7 @@ func main() {
     app.Register(
         ligo.NewModule("hello",
             ligo.Providers(ligo.Value("Hello, World!")),
-            ligo.Controllers(func(msg string) ligo.Controller {
-                return &helloController{msg: msg}
-            }),
+            ligo.Controllers(NewHelloController),
         ),
     )
 
@@ -57,10 +55,17 @@ func main() {
 
 type helloController struct { msg string }
 
+func NewHelloController(msg string) *helloController {
+    return &helloController{msg: msg}
+}
+
 func (c *helloController) Routes(r ligo.Router) {
-    r.Handle("GET", "/", func(ctx ligo.Context) error {
-        return ctx.String(200, c.msg)
-    })
+    cr := ligo.NewChainRouter(r)
+    cr.GET("/", c.Hello).Handle()
+}
+
+func (c *helloController) Hello(ctx ligo.Context) error {
+    return ctx.OK(map[string]string{"message": c.msg})
 }
 ```
 

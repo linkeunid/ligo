@@ -94,12 +94,21 @@ func ValidationErrorFilter(err error, ctx ligo.Context) error {
     }
     var ve validator.ValidationErrors
     switch {
+    case errors.As(err, &ve):
+        // ValidationPipe struct tag failures — check BEFORE ErrBadRequest because
+        // ValidationPipe joins both errors and ErrBadRequest would match first.
+        type fieldErr struct {
+            Tag   string `json:"tag"`
+            Param string `json:"param,omitempty"`
+        }
+        fields := make(map[string][]fieldErr, len(ve))
+        for _, fe := range ve {
+            fields[fe.Field()] = append(fields[fe.Field()], fieldErr{Tag: fe.Tag(), Param: fe.Param()})
+        }
+        return ctx.JSON(422, map[string]any{"errors": fields})
     case errors.Is(err, ligo.ErrBadRequest):
         // Pipe parameter parsing failed (UUIDPipe, ParseIntPipe, etc.)
         return ctx.BadRequest(err.Error())
-    case errors.As(err, &ve):
-        // ValidationPipe struct tag validation failed
-        return ctx.UnprocessableEntity(err.Error())
     }
     return err // Pass to next filter
 }
@@ -117,9 +126,10 @@ case errors.Is(err, ligo.ErrBadRequest):
     return ctx.BadRequest(err.Error())
 ```
 
-`ValidationPipe` also wraps `ligo.ErrBadRequest` on bind failures, but produces a
-`validator.ValidationErrors` on struct tag failures — check `errors.As` for that case
-and map it to 422 with `ctx.UnprocessableEntity`.
+`ValidationPipe` wraps `ligo.ErrBadRequest` on both bind failures AND struct tag failures
+(via `errors.Join`). Always check `errors.As(err, &ve)` for `validator.ValidationErrors`
+**before** `errors.Is(err, ligo.ErrBadRequest)` — otherwise the `ErrBadRequest` case
+matches first and swallows the per-field details.
 
 ### Custom Error Types
 

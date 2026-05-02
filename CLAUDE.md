@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Run tests (181 tests passing, 50.4% coverage)
+# Run tests (181 tests passing, 48.9% coverage)
 go test ./...
 go test -v ./...
 
@@ -201,7 +201,7 @@ func (c *Controller) Get(ctx ligo.Context) error {
 
 ## Testing
 
-- **181 tests passing** with 50.4% coverage
+- **181 tests passing** with 48.9% coverage
 - **Integration tests** (`integration_test.go`): Full app lifecycle, DI resolution, multiple modules, guards, pipes, interceptors
 - **Benchmarks** (`bench_test.go`): App creation, module creation, provider types, route registration, guards, pipes, interceptors
 - **Unit tests**: Comprehensive tests for internal packages (logger, module, lifecycle, resolver, container, app)

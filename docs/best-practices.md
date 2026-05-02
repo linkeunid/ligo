@@ -175,7 +175,7 @@ func (c *Controller) Routes(r ligo.Router) {
 
 ```go
 func (c *Controller) GetByID(ctx ligo.Context) error {
-    id := ctx.Get("id").(int) // Set by ParseIntPipe
+    id := ligo.Get[int](ctx, "id") // set by ParseIntPipe, already an int
     user, err := c.service.FindByID(id)
     if err != nil {
         return err

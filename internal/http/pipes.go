@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,7 @@ func ValidationPipe[T any](_ *T) Pipe {
 		if err := ctx.Bind(&input); err != nil {
 			return fmt.Errorf("validation pipe: bind failed: %w", errors.Join(err, ErrBadRequest))
 		}
-		if err := validate.Struct(input); err != nil {
+		if err := validateExhaustive(validate, &input); err != nil {
 			return fmt.Errorf("validation failed: %w", errors.Join(err, ErrBadRequest))
 		}
 		ctx.Set(ValidatedBodyKey, &input)
@@ -50,6 +51,83 @@ func ValidatedBody[T any](ctx Context) *T {
 		panic(fmt.Sprintf("ligo: ValidatedBody[%T]: no validated body in context — did you add ValidationPipe[%T] to this route?", zero, zero))
 	}
 	return v
+}
+
+// Get retrieves a value from context and asserts it to type T.
+// Use this to read values stored by pipes (ParseIntPipe, ParseBoolPipe, UUIDPipe, TrimPipe).
+// Returns the zero value of T if the key is missing or the type does not match.
+//
+//	id   := ligo.Get[int](ctx, "id")     // set by ParseIntPipe("id")
+//	ok   := ligo.Get[bool](ctx, "active") // set by ParseBoolPipe("active")
+//	uuid := ligo.Get[string](ctx, "id")   // set by UUIDPipe("id")
+func Get[T any](ctx Context, key string) T {
+	v, _ := ctx.Get(key).(T)
+	return v
+}
+
+// tagRequired is the go-playground/validator tag name for the required constraint.
+// When required fails, the validator skips all subsequent tags on that field (hasValue check),
+// so a second pass is needed to surface min/email/oneof etc. for empty fields.
+const tagRequired = "required"
+
+// validateExhaustive runs two validation passes so fields that fail "required" also
+// report all other tag failures in the same response.
+func validateExhaustive(v *validator.Validate, s any) error {
+	err1 := v.Struct(s)
+	if err1 == nil {
+		return nil
+	}
+	var ve1 validator.ValidationErrors
+	if !errors.As(err1, &ve1) {
+		return err1
+	}
+	seen := make(map[string]struct{}, len(ve1))
+	hasRequired := false
+	for _, fe := range ve1 {
+		seen[fe.Field()+"|"+fe.Tag()] = struct{}{}
+		if fe.Tag() == tagRequired {
+			hasRequired = true
+		}
+	}
+	if !hasRequired {
+		return ve1
+	}
+	rv := reflect.ValueOf(s)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	cpy := reflect.New(rv.Type()).Elem()
+	for i := 0; i < rv.NumField(); i++ {
+		src := rv.Field(i)
+		dst := cpy.Field(i)
+		if !dst.CanSet() {
+			continue
+		}
+		dst.Set(src)
+		if src.Kind() == reflect.String && src.String() == "" {
+			dst.SetString("x")
+		}
+	}
+	combined := append(validator.ValidationErrors(nil), ve1...)
+	if err2 := v.Struct(cpy.Addr().Interface()); err2 != nil {
+		var ve2 validator.ValidationErrors
+		if !errors.As(err2, &ve2) {
+			return combined
+		}
+		for _, fe := range ve2 {
+			tag, field := fe.Tag(), fe.Field()
+			if tag == tagRequired {
+				continue
+			}
+			key := field + "|" + tag
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			combined = append(combined, fe)
+			seen[key] = struct{}{}
+		}
+	}
+	return combined
 }
 
 // ParseIntPipe reads path parameter param, parses it as int, and stores the

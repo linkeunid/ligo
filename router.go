@@ -54,6 +54,21 @@ func ValidatedBody[T any](ctx Context) *T {
 	return http.ValidatedBody[T](ctx)
 }
 
+// Get retrieves a context value set by a pipe and asserts it to type T.
+// Returns the zero value of T if the key is missing or the type does not match.
+// Use this instead of ctx.Get(key).(T) to avoid a manual type assertion.
+//
+// Example:
+//
+//	func (c *UserController) GetByID(ctx ligo.Context) error {
+//	    id     := ligo.Get[int](ctx, "id")     // set by ParseIntPipe("id")
+//	    active := ligo.Get[bool](ctx, "active") // set by ParseBoolPipe("active")
+//	    uuid   := ligo.Get[string](ctx, "id")   // set by UUIDPipe("id")
+//	}
+func Get[T any](ctx Context, key string) T {
+	return http.Get[T](ctx, key)
+}
+
 // Interceptor wraps the entire request/response cycle.
 // Interceptors can modify the request before processing and the response after.
 type Interceptor = http.Interceptor
