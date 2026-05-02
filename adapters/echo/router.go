@@ -52,6 +52,7 @@ func (a *Adapter) SetLogger(log logger.Logger) {
 func (a *Adapter) Group(prefix string) httpifc.Router {
 	return &groupAdapter{
 		g:          a.e.Group(prefix),
+		prefix:     prefix,
 		middleware: a.middleware, // inherit global middleware
 		logger:     a.logger,
 	}
@@ -103,6 +104,7 @@ func (a *Adapter) requestScopeMiddleware() httpifc.Middleware {
 
 type groupAdapter struct {
 	g          *echo.Group
+	prefix     string
 	middleware []httpifc.Middleware
 	logger     logger.Logger
 }
@@ -110,6 +112,7 @@ type groupAdapter struct {
 func (g *groupAdapter) Group(prefix string) httpifc.Router {
 	return &groupAdapter{
 		g:          g.g.Group(prefix),
+		prefix:     g.prefix + prefix,
 		middleware: g.middleware,
 		logger:     g.logger,
 	}
@@ -123,7 +126,7 @@ func (g *groupAdapter) Handle(method, path string, handler httpifc.HandlerFunc) 
 	g.g.Add(method, path, g.wrapHandler(handler))
 
 	if g.logger != nil {
-		g.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("Mapped {%s, %s} route", method, path))
+		g.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("Mapped {%s, %s} route", method, g.prefix+path))
 	}
 }
 
