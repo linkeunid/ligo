@@ -5,7 +5,7 @@ Pipes run before the handler to validate, parse, or transform request data.
 ## Pipe Signature
 
 ```go
-type Pipe func(ctx Context) (any, error)
+type Pipe func(ctx Context) error
 ```
 
 If a pipe returns an error, the chain stops and the handler is not called.
@@ -72,7 +72,7 @@ cr.GET("/:id", c.Get).Pipe(ligo.UUIDPipe("id")).Handle()
 
 ### TrimPipe
 
-Trims whitespace from a query or body field:
+Trims leading and trailing whitespace from a path parameter and stores the trimmed value in context:
 
 ```go
 cr.POST("", c.Create).
@@ -145,14 +145,16 @@ func (c *UserController) Update(ctx ligo.Context) error {
 
 ```go
 func PositiveIntPipe(param string) ligo.Pipe {
-    return func(ctx ligo.Context) (any, error) {
+    return func(ctx ligo.Context) error {
         str := ctx.Param(param)
         n, err := strconv.Atoi(str)
         if err != nil || n <= 0 {
-            return nil, fmt.Errorf("param %q must be a positive integer", param)
+            return fmt.Errorf("param %q must be a positive integer: %w", param, ligo.ErrBadRequest)
         }
         ctx.Set(param, n)
-        return n, nil
+        return nil
     }
 }
 ```
+
+Wrap `ligo.ErrBadRequest` so exception middleware can detect client errors and return 400.

@@ -79,14 +79,47 @@ func UnauthorizedFilter(err error, ctx ligo.Context) error {
 
 ### Validation Error Filter
 
+Use `errors.Is` and `errors.As` to detect error types from pipes:
+
 ```go
+import (
+    "errors"
+    "github.com/go-playground/validator/v10"
+    "github.com/linkeunid/ligo"
+)
+
 func ValidationErrorFilter(err error, ctx ligo.Context) error {
-    if err != nil && strings.HasPrefix(err.Error(), "pipe error") {
-        return ctx.JSON(400, map[string]string{"error": "Validation failed"})
+    if err == nil {
+        return nil
+    }
+    var ve validator.ValidationErrors
+    switch {
+    case errors.Is(err, ligo.ErrBadRequest):
+        // Pipe parameter parsing failed (UUIDPipe, ParseIntPipe, etc.)
+        return ctx.JSON(400, map[string]string{"error": "Bad Request"})
+    case errors.As(err, &ve):
+        // ValidationPipe struct tag validation failed
+        return ctx.JSON(422, map[string]string{"error": "Unprocessable Entity"})
     }
     return err // Pass to next filter
 }
 ```
+
+## ErrBadRequest Sentinel
+
+`ligo.ErrBadRequest` is a sentinel error wrapped by all built-in param-parsing pipes
+(`UUIDPipe`, `ParseIntPipe`, `ParseBoolPipe`) when a path parameter is invalid.
+
+Detect it with `errors.Is`:
+
+```go
+case errors.Is(err, ligo.ErrBadRequest):
+    return ctx.JSON(400, map[string]string{"error": "Bad Request"})
+```
+
+`ValidationPipe` also wraps `ligo.ErrBadRequest` on bind failures, but produces a
+`validator.ValidationErrors` on struct tag failures — check `errors.As` for that case
+and map it to 422 (Unprocessable Entity).
 
 ### Custom Error Types
 
