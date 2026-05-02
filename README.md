@@ -96,13 +96,13 @@ func (c *helloController) Hello(ctx ligo.Context) error {
 
 ## Roadmap
 
-- **Current Version:** 1.0 ✅ (All requirements completed)
+- [x] **Current Version:** 1.0 (All requirements completed)
 - **Test Coverage:** 181 tests passing, 50.4% coverage
 - **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
 - **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 
 See [Roadmaps](docs/roadmaps/) for:
-  - [1.0 Release Plan](docs/roadmaps/1.0-release.md) - Complete ✅
+  - [x] [1.0 Release Plan](docs/roadmaps/1.0-release.md) - Complete
   - [Package Ecosystem](docs/roadmaps/ecosystem.md) - Separate packages for DB, microservices, etc.
   - [Microservices Guide](docs/microservices.md) - How to build distributed systems with Ligo
   - [Future Features](docs/roadmaps/future-features.md) - WebSocket, GraphQL, Scheduling
