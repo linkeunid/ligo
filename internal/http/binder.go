@@ -36,7 +36,6 @@ func (b *Binder) BindControllers(modules []module.Module) error {
 }
 
 func (b *Binder) bindModuleControllers(mod module.Module) error {
-	// Resolve module middleware
 	var modMw []Middleware
 	for _, mc := range mod.Middlewares {
 		mw, err := b.resolveMiddleware(mc)
@@ -46,24 +45,27 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 		modMw = append(modMw, mw)
 	}
 
-	// Apply module middleware if present
+	router := b.router
 	if len(modMw) > 0 {
-		moduleRouter := b.router.Group("/" + mod.Name)
+		g := b.router.Group("/" + mod.Name)
 		for _, mw := range modMw {
-			moduleRouter.Use(mw)
+			g.Use(mw)
 		}
-		for _, cc := range mod.Controllers {
-			if err := b.bindController(cc, moduleRouter, mod.Name); err != nil {
-				return err
-			}
-		}
-	} else {
-		for _, cc := range mod.Controllers {
-			if err := b.bindController(cc, b.router, mod.Name); err != nil {
-				return err
-			}
+		router = g
+	}
+
+	for _, cc := range mod.Controllers {
+		if err := b.bindController(cc, router, mod.Name); err != nil {
+			return err
 		}
 	}
+
+	for _, child := range mod.Imports {
+		if err := b.bindModuleControllers(child); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

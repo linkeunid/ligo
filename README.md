@@ -4,7 +4,7 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-152%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-169%20passing-brightgreen)](https://github.com/linkeunid/ligo)
 [![Coverage](https://img.shields.io/badge/coverage-39.8%25-yellow)](https://github.com/linkeunid/ligo)
 
 > **Note:** Ligo **v1.0** is ready. All requirements completed including comprehensive documentation, integration tests, performance benchmarks, and stability guarantees.
@@ -92,7 +92,7 @@ func (c *helloController) Routes(r ligo.Router) {
 ## Roadmap
 
 - **Current Version:** 1.0 ✅ (All requirements completed)
-- **Test Coverage:** 152 tests passing, 39.8% coverage
+- **Test Coverage:** 169 tests passing, 39.8% coverage
 - **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
 - **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 

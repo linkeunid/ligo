@@ -49,17 +49,8 @@ func RegisterProvider(c *container.Container, p Provider) {
 }
 
 // BuildModule registers providers from a module and its imports in the container.
+// The module must have been pre-expanded by ExpandModule — dynamic fields are not processed here.
 func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHooks) {
-	if mod.Dynamic != nil {
-		dynamicMod := mod.Dynamic.Factory(mod.Dynamic.Options...)
-		mod.Providers = append(mod.Providers, dynamicMod.Providers...)
-		mod.Controllers = append(mod.Controllers, dynamicMod.Controllers...)
-		mod.Imports = append(mod.Imports, dynamicMod.Imports...)
-		mod.Middlewares = append(mod.Middlewares, dynamicMod.Middlewares...)
-		mod.OnInit = append(mod.OnInit, dynamicMod.OnInit...)
-		mod.OnDestroy = append(mod.OnDestroy, dynamicMod.OnDestroy...)
-	}
-
 	modContainer := parent
 
 	for _, p := range mod.Providers {
@@ -102,4 +93,48 @@ func ExecuteHooks(hooks [][]func() error, log logger.Logger, hookName string) er
 type ModuleHooks struct {
 	OnInit    [][]func() error
 	OnDestroy [][]func() error
+}
+
+// ExpandModule materializes a dynamic module and recursively expands its imports,
+// deduplicating by module name using visited. Returns (expanded, true) if the module
+// should be processed, or (zero, false) if it was already visited.
+func ExpandModule(mod module.Module, visited map[string]bool) (module.Module, bool) {
+	if visited[mod.Name] {
+		return module.Module{}, false
+	}
+	visited[mod.Name] = true
+
+	if mod.Dynamic != nil {
+		dynamic := mod.Dynamic.Factory(mod.Dynamic.Options...)
+		mod.Providers = append(mod.Providers, dynamic.Providers...)
+		mod.Controllers = append(mod.Controllers, dynamic.Controllers...)
+		mod.Imports = append(mod.Imports, dynamic.Imports...)
+		mod.Middlewares = append(mod.Middlewares, dynamic.Middlewares...)
+		mod.OnInit = append(mod.OnInit, dynamic.OnInit...)
+		mod.OnDestroy = append(mod.OnDestroy, dynamic.OnDestroy...)
+		mod.Dynamic = nil
+	}
+
+	var expandedImports []module.Module
+	for _, child := range mod.Imports {
+		if expanded, ok := ExpandModule(child, visited); ok {
+			expandedImports = append(expandedImports, expanded)
+		}
+	}
+	mod.Imports = expandedImports
+
+	return mod, true
+}
+
+// ExpandModules expands and deduplicates a slice of top-level modules.
+// Returns nil if modules is nil or empty.
+func ExpandModules(modules []module.Module) []module.Module {
+	visited := make(map[string]bool)
+	var result []module.Module
+	for _, mod := range modules {
+		if expanded, ok := ExpandModule(mod, visited); ok {
+			result = append(result, expanded)
+		}
+	}
+	return result
 }

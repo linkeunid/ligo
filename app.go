@@ -120,7 +120,9 @@ func (a *App) Run() error {
 		app.RegisterProvider(root, p)
 	}
 
-	for _, mod := range a.modules {
+	expandedModules := app.ExpandModules(a.modules)
+
+	for _, mod := range expandedModules {
 		app.BuildModule(root, mod, a.moduleHooks)
 		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
 	}
@@ -152,7 +154,7 @@ func (a *App) Run() error {
 			a.opts.router.Use(mw)
 		}
 
-		if err := binder.BindControllers(a.modules); err != nil {
+		if err := binder.BindControllers(expandedModules); err != nil {
 			return err
 		}
 	}

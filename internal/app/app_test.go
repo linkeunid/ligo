@@ -202,31 +202,30 @@ func TestBuildModule(t *testing.T) {
 		}
 	})
 
-	t.Run("dynamic module", func(t *testing.T) {
+	t.Run("dynamic module providers are registered when pre-expanded", func(t *testing.T) {
+		// After wiring, BuildModule receives already-expanded modules.
+		// Simulate by calling ExpandModule first, then BuildModule.
 		c := container.New()
 
 		dynamicFactory := func(opts ...any) module.Module {
-			name := "dynamic"
-			if len(opts) > 0 {
-				if n, ok := opts[0].(string); ok {
-					name = n
-				}
-			}
-			return module.New(name,
+			return module.New("dynamic",
 				module.Providers(&mockProvider{eager: "dynamic-provider"}),
 			)
 		}
 
 		m := module.New("test",
-			module.Dynamic(dynamicFactory, "custom-dynamic"),
+			module.Dynamic(dynamicFactory),
 		)
 
+		visited := map[string]bool{}
+		expanded, _ := ExpandModule(m, visited)
+
 		hooks := &ModuleHooks{}
-		BuildModule(c, m, hooks)
+		BuildModule(c, expanded, hooks)
 
 		types := c.Types()
 		if len(types) == 0 {
-			t.Error("BuildModule() did not register dynamic module providers")
+			t.Error("BuildModule() did not register dynamic module providers after pre-expansion")
 		}
 	})
 
@@ -368,6 +367,156 @@ func TestModuleHooks(t *testing.T) {
 		}
 		if len(hooks.OnDestroy) != 1 {
 			t.Errorf("OnDestroy length = %d, want 1", len(hooks.OnDestroy))
+		}
+	})
+}
+
+func TestExpandModule(t *testing.T) {
+	t.Run("basic module with no imports", func(t *testing.T) {
+		visited := map[string]bool{}
+		m := module.New("auth",
+			module.Providers(&mockProvider{eager: "auth-svc"}),
+		)
+
+		expanded, ok := ExpandModule(m, visited)
+
+		if !ok {
+			t.Fatal("ExpandModule() ok = false, want true")
+		}
+		if expanded.Name != "auth" {
+			t.Errorf("expanded.Name = %q, want %q", expanded.Name, "auth")
+		}
+		if len(expanded.Providers) != 1 {
+			t.Errorf("expanded.Providers len = %d, want 1", len(expanded.Providers))
+		}
+		if !visited["auth"] {
+			t.Error("visited[\"auth\"] should be true after expansion")
+		}
+	})
+
+	t.Run("already visited module is skipped", func(t *testing.T) {
+		visited := map[string]bool{"auth": true}
+		m := module.New("auth")
+
+		_, ok := ExpandModule(m, visited)
+
+		if ok {
+			t.Error("ExpandModule() ok = true for already-visited module, want false")
+		}
+	})
+
+	t.Run("dynamic module factory is called and fields merged", func(t *testing.T) {
+		visited := map[string]bool{}
+		called := false
+
+		factory := func(opts ...any) module.Module {
+			called = true
+			return module.New("inner",
+				module.Providers(&mockProvider{eager: "dynamic-svc"}),
+			)
+		}
+
+		m := module.New("wrapper",
+			module.Dynamic(factory),
+		)
+
+		expanded, ok := ExpandModule(m, visited)
+
+		if !ok {
+			t.Fatal("ExpandModule() ok = false, want true")
+		}
+		if !called {
+			t.Error("dynamic factory was not called")
+		}
+		if expanded.Dynamic != nil {
+			t.Error("expanded.Dynamic should be nil after expansion")
+		}
+		if len(expanded.Providers) != 1 {
+			t.Errorf("expanded.Providers len = %d, want 1 (merged from dynamic)", len(expanded.Providers))
+		}
+	})
+
+	t.Run("dynamic module factory receives options", func(t *testing.T) {
+		visited := map[string]bool{}
+		var receivedOpts []any
+
+		factory := func(opts ...any) module.Module {
+			receivedOpts = opts
+			return module.New("cfg")
+		}
+
+		m := module.New("wrapper",
+			module.Dynamic(factory, "opt1", 42),
+		)
+
+		ExpandModule(m, visited)
+
+		if len(receivedOpts) != 2 {
+			t.Fatalf("factory received %d opts, want 2", len(receivedOpts))
+		}
+		if receivedOpts[0] != "opt1" {
+			t.Errorf("opts[0] = %v, want %q", receivedOpts[0], "opt1")
+		}
+		if receivedOpts[1] != 42 {
+			t.Errorf("opts[1] = %v, want 42", receivedOpts[1])
+		}
+	})
+
+	t.Run("diamond import — shared child appears once in expanded tree", func(t *testing.T) {
+		visited := map[string]bool{}
+
+		auth := module.New("auth", module.Providers(&mockProvider{eager: "auth-svc"}))
+		user := module.New("user", module.Imports(auth))
+		file := module.New("file", module.Imports(auth))
+		main := module.New("main", module.Imports(user, file))
+
+		expanded, ok := ExpandModule(main, visited)
+
+		if !ok {
+			t.Fatal("ExpandModule() ok = false")
+		}
+
+		if len(expanded.Imports) != 2 {
+			t.Fatalf("main.Imports len = %d, want 2", len(expanded.Imports))
+		}
+		userExpanded := expanded.Imports[0]
+		fileExpanded := expanded.Imports[1]
+
+		if len(userExpanded.Imports) != 1 {
+			t.Errorf("user.Imports len = %d, want 1 (auth kept)", len(userExpanded.Imports))
+		}
+		if len(fileExpanded.Imports) != 0 {
+			t.Errorf("file.Imports len = %d, want 0 (auth deduplicated)", len(fileExpanded.Imports))
+		}
+	})
+}
+
+func TestExpandModules(t *testing.T) {
+	t.Run("processes slice of modules", func(t *testing.T) {
+		a := module.New("a")
+		b := module.New("b")
+
+		result := ExpandModules([]module.Module{a, b})
+
+		if len(result) != 2 {
+			t.Errorf("ExpandModules() len = %d, want 2", len(result))
+		}
+	})
+
+	t.Run("same module in two top-level entries is deduplicated", func(t *testing.T) {
+		a := module.New("a")
+
+		result := ExpandModules([]module.Module{a, a})
+
+		if len(result) != 1 {
+			t.Errorf("ExpandModules() len = %d, want 1 (dedup)", len(result))
+		}
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		result := ExpandModules(nil)
+		if result != nil {
+			t.Errorf("ExpandModules(nil) = %v, want nil", result)
 		}
 	})
 }

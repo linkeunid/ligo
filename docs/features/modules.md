@@ -60,7 +60,7 @@ func NewUserService(repo *UserRepo) *UserService {
 
 ## Module Imports
 
-Modules can import other modules as children:
+Modules can import other modules as children. When a module is registered, **all controllers and middleware from its imported children are bound recursively** — you do not need to register child modules separately.
 
 ```go
 func ApiModule() ligo.Module {
@@ -72,6 +72,45 @@ func ApiModule() ligo.Module {
         ),
     )
 }
+
+// Registering only ApiModule is enough — routes from user, auth, and posts are all bound.
+app.Register(ApiModule())
+```
+
+### Middleware Scoping
+
+Module middleware applies only to that module's own controllers — it does not cascade to imported children. This follows NestJS convention. To protect all routes (including imported ones), use app-level middleware:
+
+```go
+app := ligo.New(
+    ligo.WithRouter(echo.NewAdapter()),
+    ligo.WithMiddleware(AuthMiddleware), // applies to all routes
+)
+```
+
+### Diamond Imports
+
+If two modules both import the same child, the child is processed exactly once (deduplicated by module name). There is no double-registration:
+
+```go
+// auth is imported by both user and file — it is bound once.
+userModule := ligo.NewModule("user", ligo.Imports(auth.Module()), ...)
+fileModule := ligo.NewModule("file", ligo.Imports(auth.Module()), ...)
+mainModule := ligo.NewModule("main", ligo.Imports(userModule, fileModule))
+```
+
+> **Important:** Module names must be unique across the tree. Two different modules with the same name will have only the first one processed; the second is silently skipped.
+
+### Dynamic Modules
+
+Dynamic modules are fully expanded (factory called, all fields merged) before their imports are traversed, so child modules added by the factory are also bound correctly:
+
+```go
+ligo.Dynamic(func(opts ...any) ligo.Module {
+    return ligo.NewModule("config",
+        ligo.Imports(database.Module()), // this child is also bound
+    )
+})
 ```
 
 ## Provider Visibility

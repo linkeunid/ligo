@@ -765,3 +765,125 @@ func TestErrorHandling(t *testing.T) {
 		}
 	})
 }
+
+// importedController is used by integration tests to verify route binding from imported modules.
+type importedController struct {
+	path  string
+	calls *atomic.Int32
+}
+
+func (c *importedController) Routes(r ligo.Router) {
+	r.Handle("GET", c.path, func(ctx ligo.Context) error { return ctx.OK("ok") })
+	c.calls.Add(1)
+}
+
+// TestImportedModuleRoutes verifies that controllers from imported child modules
+// are registered when the parent module is the only module passed to app.Register.
+func TestImportedModuleRoutes(t *testing.T) {
+	var authCalls, userCalls atomic.Int32
+
+	authModule := ligo.NewModule("auth",
+		ligo.Controllers(func() ligo.Controller {
+			return &importedController{path: "/auth/login", calls: &authCalls}
+		}),
+	)
+	userModule := ligo.NewModule("user",
+		ligo.Controllers(func() ligo.Controller {
+			return &importedController{path: "/user/list", calls: &userCalls}
+		}),
+	)
+	mainModule := ligo.NewModule("main",
+		ligo.Imports(authModule, userModule),
+	)
+
+	application := ligo.New(
+		ligo.WithRouter(echo.NewAdapter()),
+		ligo.WithAddr(":0"),
+	)
+	application.Register(mainModule)
+
+	runErr := make(chan error, 1)
+	go func() { runErr <- application.Run() }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	if authCalls.Load() != 1 {
+		t.Errorf("auth controller Routes() called %d times, want 1", authCalls.Load())
+	}
+	if userCalls.Load() != 1 {
+		t.Errorf("user controller Routes() called %d times, want 1", userCalls.Load())
+	}
+
+	go func() { <-runErr }()
+}
+
+// TestSharedImportRegisteredOnce verifies the diamond pattern: when two modules
+// both import the same child, that child's controllers are registered exactly once.
+func TestSharedImportRegisteredOnce(t *testing.T) {
+	var authCalls atomic.Int32
+
+	authModule := ligo.NewModule("shared-auth",
+		ligo.Controllers(func() ligo.Controller {
+			return &importedController{path: "/shared-auth/verify", calls: &authCalls}
+		}),
+	)
+	userModule := ligo.NewModule("shared-user", ligo.Imports(authModule))
+	fileModule := ligo.NewModule("shared-file", ligo.Imports(authModule))
+	mainModule := ligo.NewModule("shared-main", ligo.Imports(userModule, fileModule))
+
+	application := ligo.New(
+		ligo.WithRouter(echo.NewAdapter()),
+		ligo.WithAddr(":0"),
+	)
+	application.Register(mainModule)
+
+	runErr := make(chan error, 1)
+	go func() { runErr <- application.Run() }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	if authCalls.Load() != 1 {
+		t.Errorf("shared auth controller Routes() called %d times, want exactly 1", authCalls.Load())
+	}
+
+	go func() { <-runErr }()
+}
+
+// TestDynamicModuleWithImports verifies that a dynamic module's child imports
+// have their controllers bound after dynamic expansion.
+func TestDynamicModuleWithImports(t *testing.T) {
+	var childCalls atomic.Int32
+
+	childModule := ligo.NewModule("dyn-child",
+		ligo.Controllers(func() ligo.Controller {
+			return &importedController{path: "/dyn-child/ping", calls: &childCalls}
+		}),
+	)
+
+	dynamicFactory := func(opts ...any) ligo.Module {
+		return ligo.NewModule("dyn-inner",
+			ligo.Imports(childModule),
+		)
+	}
+
+	wrapperModule := ligo.NewModule("dyn-wrapper",
+		ligo.Dynamic(dynamicFactory),
+	)
+
+	application := ligo.New(
+		ligo.WithRouter(echo.NewAdapter()),
+		ligo.WithAddr(":0"),
+	)
+	application.Register(wrapperModule)
+
+	runErr := make(chan error, 1)
+	go func() { runErr <- application.Run() }()
+
+	time.Sleep(200 * time.Millisecond)
+
+	if childCalls.Load() != 1 {
+		t.Errorf("dynamic child controller Routes() called %d times, want 1", childCalls.Load())
+	}
+
+	go func() { <-runErr }()
+}
