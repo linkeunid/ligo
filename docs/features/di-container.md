@@ -8,7 +8,8 @@ The dependency injection container manages provider registration and dependency 
 - **Transient providers** - New instance per resolve
 - **Cycle detection** - Chain-based detection prevents deadlock
 - **Auto-injection** - Dependencies resolved via reflection
-- **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`
+- **Interface type support** - Register and resolve interface types; fallback scan finds a concrete implementor automatically
+- **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`, `ErrAmbiguousDependency`
 
 ## How It Works
 
@@ -36,6 +37,28 @@ When resolving a dependency:
 2. Check for circular dependencies
 3. Resolve dependencies recursively
 4. Create and cache instance
+
+## Interface Type Support
+
+`Factory[T]` and `Value[T]` work with interface types. When a factory function declares an interface parameter, the container scans registered providers for a concrete type that implements it:
+
+```go
+type FileRepository interface {
+    Save(file []byte) error
+}
+
+// Register concrete type
+ligo.Factory[*memory.FileRepository](func(cfg *Config) *memory.FileRepository {
+    return memory.NewFileRepository(cfg.UploadDir)
+})
+
+// Register usecase that depends on the interface
+ligo.Factory[*FileUseCase](NewFileUseCase) // func NewFileUseCase(repo FileRepository) *FileUseCase
+
+// Container resolves: *memory.FileRepository implements FileRepository ✓
+```
+
+If two registered types implement the same interface, `ErrAmbiguousDependency` is returned listing both implementors. After first resolution, the result is cached under the interface type key for O(1) subsequent lookups.
 
 ## Error Types
 
@@ -68,6 +91,17 @@ Thrown when registering the same type twice:
 ligo.Factory[*UserService](NewUserService1)
 ligo.Factory[*UserService](NewUserService2)
 // Error: duplicate provider for *UserService
+```
+
+### ErrAmbiguousDependency
+
+Thrown when multiple registered types implement the same interface:
+
+```go
+ligo.Factory[*PgUserRepo](NewPgUserRepo)   // implements UserRepository
+ligo.Factory[*MemUserRepo](NewMemUserRepo) // also implements UserRepository
+
+// Resolving UserRepository → Error: ambiguous dependency, lists both types
 ```
 
 ## Thread Safety

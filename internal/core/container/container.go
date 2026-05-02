@@ -88,8 +88,7 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 
 // Resolve returns an instance of type T from the container.
 func Resolve[T any](c *Container) T {
-	var zero T
-	typ := reflect.TypeOf(zero)
+	typ := reflect.TypeFor[T]()
 
 	instance, err := c.resolve(typ, nil)
 	if err != nil {
@@ -109,8 +108,6 @@ func ResolveByType(c *Container, typ reflect.Type) any {
 // resolve resolves a type, tracking the dependency chain for cycle detection.
 // Cycle detection uses chain (per-call), NOT global resolving map.
 func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error) {
-	// Check for cycle using chain (per-call, not global)
-	// This prevents deadlock: we detect cycle BEFORE trying to acquire lock
 	for _, t := range chain {
 		if t == typ {
 			return nil, &ErrCircularDependency{
@@ -119,10 +116,43 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 		}
 	}
 
-	// Check provider exists (read lock on providers map)
+	// Fast path: cache hit (handles cached interface aliases too)
+	if val, ok := c.cache.Load(typ); ok {
+		return val, nil
+	}
+
 	c.mu.RLock()
 	entry, ok := c.providers[typ]
 	c.mu.RUnlock()
+
+	// Interface fallback: scan for a concrete type that implements the interface.
+	requestedTyp := typ
+	if !ok && typ.Kind() == reflect.Interface {
+		var matchType reflect.Type
+		var matchEntry ProviderEntry
+		var implementors []string
+
+		c.mu.RLock()
+		for t, e := range c.providers {
+			if t.Implements(typ) {
+				implementors = append(implementors, t.String())
+				if matchType == nil {
+					matchType = t
+					matchEntry = e
+				}
+			}
+		}
+		c.mu.RUnlock()
+
+		switch len(implementors) {
+		case 0:
+			// no match — fall through to parent/missing
+		case 1:
+			entry, ok, typ = matchEntry, true, matchType
+		default:
+			return nil, &ErrAmbiguousDependency{Interface: typ.String(), Implementors: implementors}
+		}
+	}
 
 	// If not found in this container, check parent
 	if !ok && c.parent != nil {
@@ -133,35 +163,34 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 		return nil, fmt.Errorf("ligo: missing dependency %s", typ.String())
 	}
 
-	// Transient: skip ALL locking and caching - each resolve is independent
+	// Transient: skip ALL locking and caching — each resolve is independent
 	if entry.transient {
 		return c.build(typ, entry, chain)
 	}
 
-	// Singleton: check cache before locking
 	if val, ok := c.cache.Load(typ); ok {
 		return val, nil
 	}
 
-	// Singleton: per-type double-check locking
 	lockIface, _ := c.locks.LoadOrStore(typ, &sync.Mutex{})
 	lock := lockIface.(*sync.Mutex)
 	lock.Lock()
 	defer lock.Unlock()
 
-	// Double-check: another goroutine may have resolved it
 	if val, ok := c.cache.Load(typ); ok {
 		return val, nil
 	}
 
-	// Build the instance
 	instance, err := c.build(typ, entry, chain)
 	if err != nil {
 		return nil, err
 	}
 
-	// Store in cache
 	c.cache.Store(typ, instance)
+	// Also cache under the original interface type so subsequent lookups skip the scan.
+	if requestedTyp != typ {
+		c.cache.Store(requestedTyp, instance)
+	}
 	return instance, nil
 }
 
@@ -227,6 +256,16 @@ type ErrDuplicateProvider struct {
 
 func (e *ErrDuplicateProvider) Error() string {
 	return fmt.Sprintf("ligo: duplicate provider for type %s", e.Type)
+}
+
+// ErrAmbiguousDependency is returned when multiple registered types implement the requested interface.
+type ErrAmbiguousDependency struct {
+	Interface    string
+	Implementors []string
+}
+
+func (e *ErrAmbiguousDependency) Error() string {
+	return fmt.Sprintf("ligo: ambiguous dependency: multiple types implement %s: %v", e.Interface, e.Implementors)
 }
 
 // DIError wraps container resolution failures with context.

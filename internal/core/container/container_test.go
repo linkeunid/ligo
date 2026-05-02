@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -23,6 +24,18 @@ type testServiceB struct {
 type testWrapper struct {
 	svc *testService
 }
+
+type testDoer interface{ Do() string }
+type testDoerImpl struct{}
+
+func (testDoerImpl) Do() string { return "done" }
+
+type testGreeter interface{ Greet() string }
+type testGreeterA struct{}
+type testGreeterB struct{}
+
+func (testGreeterA) Greet() string { return "hello-a" }
+func (testGreeterB) Greet() string { return "hello-b" }
 
 func TestContainerProvideAndResolve(t *testing.T) {
 	c := New()
@@ -219,6 +232,17 @@ func TestConcurrentResolve(t *testing.T) {
 	}
 }
 
+func TestResolveInterfaceTypeDirectKey(t *testing.T) {
+	c := New()
+	doerType := reflect.TypeOf((*testDoer)(nil)).Elem()
+	c.Register(doerType, NewEntry(nil, testDoerImpl{}, nil, false, false))
+
+	result := Resolve[testDoer](c)
+	if result.Do() != "done" {
+		t.Fatalf("expected 'done', got %s", result.Do())
+	}
+}
+
 // TestConcurrentTransient verifies concurrent transient resolves.
 func TestConcurrentTransient(t *testing.T) {
 	c := New()
@@ -254,5 +278,63 @@ func TestConcurrentTransient(t *testing.T) {
 	// Factory should be called 10 times
 	if counter.Load() != 10 {
 		t.Fatalf("expected factory called 10 times, got %d", counter.Load())
+	}
+}
+
+func TestResolveByInterface_FallbackScan(t *testing.T) {
+	c := New()
+	implType := reflect.TypeOf(testGreeterA{})
+	c.Register(implType, NewEntry(nil, testGreeterA{}, nil, false, false))
+
+	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+	result, err := c.resolve(greeterType, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.(testGreeter).Greet() != "hello-a" {
+		t.Fatalf("expected 'hello-a', got %s", result.(testGreeter).Greet())
+	}
+}
+
+func TestResolveByInterface_AmbiguousReturnsError(t *testing.T) {
+	c := New()
+	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(nil, testGreeterA{}, nil, false, false))
+	c.Register(reflect.TypeOf(testGreeterB{}), NewEntry(nil, testGreeterB{}, nil, false, false))
+
+	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+	_, err := c.resolve(greeterType, nil)
+	if err == nil {
+		t.Fatal("expected error for ambiguous dependency")
+	}
+
+	var ambig *ErrAmbiguousDependency
+	if !errors.As(err, &ambig) {
+		t.Fatalf("expected ErrAmbiguousDependency, got %T: %v", err, err)
+	}
+	if len(ambig.Implementors) != 2 {
+		t.Fatalf("expected 2 implementors, got %d: %v", len(ambig.Implementors), ambig.Implementors)
+	}
+}
+
+func TestResolveByInterface_CachedAfterFirst(t *testing.T) {
+	c := New()
+	counter := atomic.Int32{}
+	factory := func(args []reflect.Value) (any, error) {
+		counter.Add(1)
+		return testGreeterA{}, nil
+	}
+	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(factory, nil, nil, false, false))
+
+	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+
+	if _, err := c.resolve(greeterType, nil); err != nil {
+		t.Fatalf("first resolve failed: %v", err)
+	}
+	if _, err := c.resolve(greeterType, nil); err != nil {
+		t.Fatalf("second resolve failed: %v", err)
+	}
+
+	if counter.Load() != 1 {
+		t.Fatalf("expected factory called once (cached), got %d", counter.Load())
 	}
 }

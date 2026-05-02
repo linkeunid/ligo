@@ -23,9 +23,8 @@ type Provider struct {
 //	ligo.Value("config-value")
 //	ligo.Value(&Config{Debug: true})
 func Value[T any](instance T) Provider {
-	var zero T
 	return Provider{
-		typ:   reflect.TypeOf(zero),
+		typ:   reflect.TypeFor[T](),
 		eager: instance,
 	}
 }
@@ -40,9 +39,8 @@ func Value[T any](instance T) Provider {
 //	    return NewUserService(repo)
 //	})
 func Factory[T any](fn any) Provider {
-	var zero T
 	return Provider{
-		typ: reflect.TypeOf(zero),
+		typ: reflect.TypeFor[T](),
 		fn:  fn,
 	}
 }
