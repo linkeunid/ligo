@@ -92,7 +92,7 @@ func (c *helloController) Routes(r ligo.Router) {
 ## Roadmap
 
 - **Current Version:** 1.0 ✅ (All requirements completed)
-- **Test Coverage:** 175 tests passing, 47.8% coverage
+- **Test Coverage:** 181 tests passing, 50.4% coverage
 - **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
 - **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 

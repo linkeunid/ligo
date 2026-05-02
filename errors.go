@@ -2,7 +2,10 @@ package ligo
 
 // Package ligo provides error types for the Ligo framework.
 
-import "github.com/linkeunid/ligo/internal/core/container"
+import (
+	"github.com/linkeunid/ligo/internal/core/container"
+	http "github.com/linkeunid/ligo/internal/http"
+)
 
 // ErrAppAlreadyStarted is returned when trying to modify an app after Run() has been called.
 // This includes calling Register() or Provide() after the application has started.
@@ -26,3 +29,6 @@ type ErrDuplicateProvider = container.ErrDuplicateProvider
 
 // DIError is a general error type for dependency injection operations.
 type DIError = container.DIError
+
+// ErrControllerBinding is returned when a controller's dependency chain cannot be fully resolved.
+type ErrControllerBinding = http.ErrControllerBinding

@@ -50,5 +50,9 @@ func (r *Resolver) resolve(typ reflect.Type) any {
 	r.chain = append(r.chain, typ)
 	defer func() { r.chain = r.chain[:len(r.chain)-1] }()
 
-	return container.ResolveByType(r.container, typ)
+	val, err := container.ResolveByType(r.container, typ)
+	if err != nil {
+		panic(err)
+	}
+	return val
 }

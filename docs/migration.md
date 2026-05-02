@@ -32,6 +32,12 @@ type CreateUserInput struct {
 
 cr.POST("", c.Create).Pipe(ligo.ValidationPipe(&CreateUserInput{}))
 
+// Retrieve the validated body in the handler:
+func (c *Controller) Create(ctx ligo.Context) error {
+    input := ligo.ValidatedBody[CreateUserInput](ctx) // *CreateUserInput
+    // ...
+}
+
 // ParseIntPipe for integer parameters
 cr.GET("/:id", c.Get).Pipe(ligo.ParseIntPipe("id"))
 

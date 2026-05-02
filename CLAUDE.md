@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Run tests (175 tests passing, 47.8% coverage)
+# Run tests (181 tests passing, 50.4% coverage)
 go test ./...
 go test -v ./...
 
@@ -184,7 +184,7 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - Chain-based cycle detection (prevents deadlock)
 - Auto-injection via reflection
 - Interface type support: `Factory[MyInterface](fn)` registers under the interface type; container resolves interface-typed parameters by scanning for a registered concrete implementor
-- Error types: `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`, `ErrAmbiguousDependency`
+- Error types: `ErrCircularDependency`, `ErrMissingDependency` (with `Cause`/`Unwrap` chain), `ErrDuplicateProvider`, `ErrAmbiguousDependency`, `ErrControllerBinding` (tree-format message)
 
 ## Development Notes
 
@@ -201,7 +201,7 @@ func (c *Controller) Get(ctx ligo.Context) error {
 
 ## Testing
 
-- **175 tests passing** with 47.8% coverage
+- **181 tests passing** with 50.4% coverage
 - **Integration tests** (`integration_test.go`): Full app lifecycle, DI resolution, multiple modules, guards, pipes, interceptors
 - **Benchmarks** (`bench_test.go`): App creation, module creation, provider types, route registration, guards, pipes, interceptors
 - **Unit tests**: Comprehensive tests for internal packages (logger, module, lifecycle, resolver, container, app)
@@ -236,5 +236,5 @@ func (c *Controller) Get(ctx ligo.Context) error {
 ## Built-in Utilities
 
 **Guards:** `RolesGuard`, `AdminGuard`, `ThrottleGuard`
-**Pipes:** `ValidationPipe`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`
+**Pipes:** `ValidationPipe`, `ValidatedBody[T]`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`
 **Interceptors:** `TimeoutInterceptor`, `LoggingInterceptor`

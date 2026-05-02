@@ -9,7 +9,8 @@ The dependency injection container manages provider registration and dependency 
 - **Cycle detection** - Chain-based detection prevents deadlock
 - **Auto-injection** - Dependencies resolved via reflection
 - **Interface type support** - Register and resolve interface types; fallback scan finds a concrete implementor automatically
-- **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`, `ErrAmbiguousDependency`
+- **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`, `ErrAmbiguousDependency`, `ErrControllerBinding`
+- **Tree-format error messages** - Transitive missing dependencies produce a full chain showing exactly which type is missing and why
 
 ## How It Works
 
@@ -64,12 +65,12 @@ If two registered types implement the same interface, `ErrAmbiguousDependency` i
 
 ### ErrMissingDependency
 
-Thrown when a dependency cannot be found:
+Thrown when a dependency cannot be found. For transitive failures, the full chain is preserved via `Cause`/`Unwrap` and surfaced through `ErrControllerBinding`:
 
 ```go
-// If *UserRepo is not registered
+// If *UserRepo is not registered but *UserService needs it:
 ligo.Factory[*UserService](NewUserService)
-// Error: missing dependency *UserRepo
+// ErrMissingDependency{Type: "*UserRepo", RequiredBy: "*UserService", Cause: ...}
 ```
 
 ### ErrCircularDependency
@@ -103,6 +104,19 @@ ligo.Factory[*MemUserRepo](NewMemUserRepo) // also implements UserRepository
 
 // Resolving UserRepository → Error: ambiguous dependency, lists both types
 ```
+
+### ErrControllerBinding
+
+Thrown when a controller's dependency chain cannot be fully resolved. Produces a tree-format message showing the full chain:
+
+```
+ligo: cannot build UserController in module "user"
+  *usecase.UserUseCase  ← required by UserController
+    repository.UserRepository  ← required by *usecase.UserUseCase
+      no provider registered
+```
+
+Use `errors.As` to inspect the structured fields (`Module`, `TypeName`, `Dependency`, `Cause`).
 
 ## Thread Safety
 

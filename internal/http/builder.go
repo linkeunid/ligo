@@ -83,18 +83,13 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 		}
 	}
 
-	// Apply pipes (transform input)
+	// Apply pipes (validate/transform request data)
 	if len(rb.pipes) > 0 {
 		prev := wrapped
 		wrapped = func(ctx Context) error {
-			// Pipes validate/transform request body
-			// Store bound data in context for pipes to access
 			for _, pipe := range rb.pipes {
-				// Get the bound data from context (if already bound)
-				// Otherwise, pipe will run with nil input
-				boundData := ctx.Get("_ligo_bound_data")
-				if _, err := pipe(boundData); err != nil {
-					return fmt.Errorf("pipe error: %w", err)
+				if err := pipe(ctx); err != nil {
+					return err
 				}
 			}
 			return prev(ctx)

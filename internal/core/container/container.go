@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -99,10 +100,9 @@ func Resolve[T any](c *Container) T {
 }
 
 // ResolveByType returns an instance of the specified type from the container.
-// Returns nil if the type is not registered.
-func ResolveByType(c *Container, typ reflect.Type) any {
-	instance, _ := c.resolve(typ, nil)
-	return instance
+// Returns (nil, error) if the type cannot be resolved.
+func ResolveByType(c *Container, typ reflect.Type) (any, error) {
+	return c.resolve(typ, nil)
 }
 
 // resolve resolves a type, tracking the dependency chain for cycle detection.
@@ -160,7 +160,7 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 	}
 
 	if !ok {
-		return nil, fmt.Errorf("ligo: missing dependency %s", typ.String())
+		return nil, &ErrMissingDependency{Type: typ.String()}
 	}
 
 	// Transient: skip ALL locking and caching — each resolve is independent
@@ -208,10 +208,17 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 		for i, argType := range entry.argTypes {
 			arg, err := c.resolve(argType, newChain)
 			if err != nil {
-				return nil, &ErrMissingDependency{
-					Type:       argType.String(),
-					RequiredBy: typ.String(),
+				var missing *ErrMissingDependency
+				if errors.As(err, &missing) {
+					return nil, &ErrMissingDependency{
+						Type:       argType.String(),
+						RequiredBy: typ.String(),
+						Cause:      err,
+					}
 				}
+				// Only ErrMissingDependency is wrapped to add caller context;
+				// other error types already carry full chain info.
+				return nil, err
 			}
 			args[i] = reflect.ValueOf(arg)
 		}
@@ -234,11 +241,14 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 type ErrMissingDependency struct {
 	Type       string
 	RequiredBy string
+	Cause      error
 }
 
 func (e *ErrMissingDependency) Error() string {
 	return fmt.Sprintf("ligo: missing dependency %s (required by %s)", e.Type, e.RequiredBy)
 }
+
+func (e *ErrMissingDependency) Unwrap() error { return e.Cause }
 
 // ErrCircularDependency is returned when a circular dependency is detected.
 type ErrCircularDependency struct {

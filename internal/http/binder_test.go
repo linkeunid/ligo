@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 
@@ -123,4 +124,34 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 			t.Errorf("controller Routes() called %d times, want 1", calls.Load())
 		}
 	})
+}
+
+type myBinderService struct{}
+
+func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
+	c := container.New()
+	// Do NOT register myBinderService — binder should return ErrControllerBinding
+
+	mod := module.New("user",
+		module.Controllers(func(svc *myBinderService) Controller {
+			return nil
+		}),
+	)
+
+	router := &mockRouter{}
+	log := logger.New()
+	binder := NewBinder(c, router, log)
+
+	err := binder.BindControllers([]module.Module{mod})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var bindErr *ErrControllerBinding
+	if !errors.As(err, &bindErr) {
+		t.Fatalf("expected *ErrControllerBinding, got %T: %v", err, err)
+	}
+	if bindErr.Module != "user" {
+		t.Errorf("Module = %q, want %q", bindErr.Module, "user")
+	}
 }

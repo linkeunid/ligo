@@ -28,8 +28,10 @@ type RouteBuilder interface {
 // Guard determines if a request should proceed (authorization).
 type Guard func(ctx Context) (bool, error)
 
-// Pipe transforms input data before it reaches the handler (validation, parsing).
-type Pipe func(any) (any, error)
+// Pipe transforms and validates request data before it reaches the handler.
+// It receives the full request context so it can read path params, bind the
+// request body, or perform any other context-aware transformation.
+type Pipe func(ctx Context) error
 
 // Interceptor wraps the entire request/response cycle (logging, caching, transformation).
 type Interceptor func(ctx Context, next HandlerFunc) error

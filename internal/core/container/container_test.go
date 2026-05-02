@@ -338,3 +338,50 @@ func TestResolveByInterface_CachedAfterFirst(t *testing.T) {
 		t.Fatalf("expected factory called once (cached), got %d", counter.Load())
 	}
 }
+
+// testSvcA and testSvcB are used in TestBuildPreservesCause to avoid conflicts.
+type testSvcA struct{}
+type testSvcB struct{}
+
+func TestBuildPreservesCause(t *testing.T) {
+	c := New()
+	bType := reflect.TypeOf(testSvcB{})
+	aType := reflect.TypeOf(testSvcA{})
+
+	// Register serviceA with a factory that requires serviceB (not registered)
+	c.Register(aType, NewEntry(
+		func(args []reflect.Value) (any, error) { return testSvcA{}, nil },
+		nil,
+		[]reflect.Type{bType},
+		false, false,
+	))
+
+	_, err := c.resolve(aType, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var missing *ErrMissingDependency
+	if !errors.As(err, &missing) {
+		t.Fatalf("expected ErrMissingDependency, got %T: %v", err, err)
+	}
+	if missing.Type != bType.String() {
+		t.Fatalf("expected missing type %s, got %s", bType.String(), missing.Type)
+	}
+	if missing.RequiredBy != aType.String() {
+		t.Fatalf("expected required by %s, got %s", aType.String(), missing.RequiredBy)
+	}
+}
+
+func TestResolveByType_ReturnsError(t *testing.T) {
+	c := New()
+	typ := reflect.TypeOf(testSvcA{})
+	// Not registered — should return error
+	val, err := ResolveByType(c, typ)
+	if err == nil {
+		t.Fatal("expected error from ResolveByType when type not registered")
+	}
+	if val != nil {
+		t.Fatalf("expected nil value, got %v", val)
+	}
+}

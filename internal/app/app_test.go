@@ -80,8 +80,8 @@ func TestBuildProviderEntry(t *testing.T) {
 		c.Register(typ, entry)
 
 		// Resolve twice - transient should create new instances
-		v1 := container.ResolveByType(c, typ)
-		v2 := container.ResolveByType(c, typ)
+		v1, _ := container.ResolveByType(c, typ)
+		v2, _ := container.ResolveByType(c, typ)
 
 		// For eager providers, same value is returned even with transient
 		// The flag is preserved in the entry structure
@@ -112,7 +112,10 @@ func TestRegisterProvider(t *testing.T) {
 		}
 
 		// Verify we can resolve the value
-		val := container.ResolveByType(c, reflect.TypeOf("string"))
+		val, err := container.ResolveByType(c, reflect.TypeOf("string"))
+		if err != nil {
+			t.Fatalf("ResolveByType() error = %v", err)
+		}
 		if val != "test" {
 			t.Errorf("Resolve() = %v, want 'test'", val)
 		}

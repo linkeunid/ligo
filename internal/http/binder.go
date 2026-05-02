@@ -1,8 +1,10 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
@@ -38,7 +40,7 @@ func (b *Binder) BindControllers(modules []module.Module) error {
 func (b *Binder) bindModuleControllers(mod module.Module) error {
 	var modMw []Middleware
 	for _, mc := range mod.Middlewares {
-		mw, err := b.resolveMiddleware(mc)
+		mw, err := b.resolveMiddleware(mc, mod.Name)
 		if err != nil {
 			return err
 		}
@@ -69,8 +71,8 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 	return nil
 }
 
-func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware, error) {
-	return b.resolveConstructor(mc.Fn, "Middleware", func(v reflect.Value) (Middleware, error) {
+func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor, modName string) (Middleware, error) {
+	return b.resolveConstructor(mc.Fn, "Middleware", modName, func(v reflect.Value) (Middleware, error) {
 		mw, ok := v.Interface().(Middleware)
 		if !ok {
 			return nil, fmt.Errorf("ligo: constructor must return Middleware")
@@ -79,7 +81,7 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor) (Middleware,
 	})
 }
 
-func (b *Binder) resolveConstructor(fn any, typeName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
+func (b *Binder) resolveConstructor(fn any, typeName string, modName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 
@@ -95,9 +97,14 @@ func (b *Binder) resolveConstructor(fn any, typeName string, validate func(refle
 	// Resolve dependencies
 	args := make([]reflect.Value, len(argTypes))
 	for i, argType := range argTypes {
-		resolved := container.ResolveByType(b.container, argType)
-		if resolved == nil {
-			return nil, fmt.Errorf("ligo: missing dependency %s for %s", argType.String(), typeName)
+		resolved, err := container.ResolveByType(b.container, argType)
+		if err != nil {
+			return nil, &ErrControllerBinding{
+				Module:     modName,
+				TypeName:   typeName,
+				Dependency: argType.String(),
+				Cause:      err,
+			}
 		}
 		args[i] = reflect.ValueOf(resolved)
 	}
@@ -112,7 +119,7 @@ func (b *Binder) resolveConstructor(fn any, typeName string, validate func(refle
 }
 
 func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) error {
-	_, err := b.resolveConstructor(cc.Fn, "Controller", func(v reflect.Value) (Middleware, error) {
+	_, err := b.resolveConstructor(cc.Fn, "Controller", modName, func(v reflect.Value) (Middleware, error) {
 		ctrl, ok := v.Interface().(Controller)
 		if !ok {
 			return nil, fmt.Errorf("ligo: constructor must return Controller")
@@ -161,4 +168,35 @@ func (b *Binder) extractControllerName(fn any) string {
 		return fnName[3:]
 	}
 	return fnName
+}
+
+// ErrControllerBinding is returned when a controller's dependency chain cannot be fully resolved.
+type ErrControllerBinding struct {
+	Module     string
+	TypeName   string
+	Dependency string
+	Cause      error
+}
+
+func (e *ErrControllerBinding) Error() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "ligo: cannot build %s in module %q\n", e.TypeName, e.Module)
+	writeChain(&b, e.Dependency, e.TypeName, e.Cause, "  ")
+	return b.String()
+}
+
+func (e *ErrControllerBinding) Unwrap() error { return e.Cause }
+
+// writeChain appends the dependency chain to b.
+// dep is the type that failed; requiredBy is its direct consumer.
+func writeChain(b *strings.Builder, dep, requiredBy string, cause error, indent string) {
+	fmt.Fprintf(b, "%s%s  <- required by %s\n", indent, dep, requiredBy)
+	var next *container.ErrMissingDependency
+	if errors.As(cause, &next) {
+		writeChain(b, next.Type, dep, next.Cause, indent+"  ")
+	} else if cause != nil {
+		fmt.Fprintf(b, "%s  %s", indent, cause.Error())
+	} else {
+		fmt.Fprintf(b, "%s  no provider registered", indent)
+	}
 }

@@ -37,6 +37,23 @@ type Guard = http.Guard
 // Pipes are used for validation, parsing, and data transformation.
 type Pipe = http.Pipe
 
+// ValidatedBodyKey is the context key where ValidationPipe stores the validated body.
+// Prefer ValidatedBody[T] over accessing this key directly.
+const ValidatedBodyKey = http.ValidatedBodyKey
+
+// ValidatedBody retrieves the validated body stored by ValidationPipe[T].
+// Panics with a clear message if ValidationPipe was not added to the route.
+//
+// Example:
+//
+//	func (c *UserController) Create(ctx ligo.Context) error {
+//	    input := ligo.ValidatedBody[CreateUserInput](ctx)
+//	    // input is *CreateUserInput, guaranteed non-nil
+//	}
+func ValidatedBody[T any](ctx Context) *T {
+	return http.ValidatedBody[T](ctx)
+}
+
 // Interceptor wraps the entire request/response cycle.
 // Interceptors can modify the request before processing and the response after.
 type Interceptor = http.Interceptor

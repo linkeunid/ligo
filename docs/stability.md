@@ -70,6 +70,7 @@ The following public APIs are considered stable and will follow semantic version
 
 **Pipes:**
 - `ValidationPipe[T any](v *T) Pipe`
+- `ValidatedBody[T any](ctx Context) *T`
 - `ParseIntPipe(param string) Pipe`
 - `ParseBoolPipe(param string) Pipe`
 - `UUIDPipe(param string) Pipe`

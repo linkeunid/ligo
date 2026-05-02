@@ -1,120 +1,109 @@
 # Pipes
 
-Pipes transform input data before it reaches the handler. They're used for validation, parsing, and transformation.
+Pipes run before the handler to validate, parse, or transform request data.
 
 ## Pipe Signature
 
 ```go
-type Pipe func(any) (any, error)
+type Pipe func(ctx Context) (any, error)
 ```
 
-## Creating a Pipe
+If a pipe returns an error, the chain stops and the handler is not called.
+
+## Built-in Pipes
+
+### ValidationPipe
+
+Binds the request body to `T`, validates it using `validate` struct tags, and stores the result in context. Retrieve it in the handler with `ValidatedBody[T]`:
 
 ```go
-func ValidationPipe() Pipe {
-    return func(input any) (any, error) {
-        // Validate input
-        if err := validate(input); err != nil {
-            return nil, err
-        }
-        return input, nil
-    }
+type CreateUserInput struct {
+    Name  string `json:"name"  validate:"required,min=3"`
+    Email string `json:"email" validate:"required,email"`
 }
-```
 
-## Using Pipes
+func (c *UserController) Create(ctx ligo.Context) error {
+    input := ligo.ValidatedBody[CreateUserInput](ctx) // *CreateUserInput
+    user, err := c.service.Create(*input)
+    if err != nil {
+        return err
+    }
+    return ctx.Created(user)
+}
 
-```go
 func (c *UserController) Routes(r ligo.Router) {
     cr := ligo.NewChainRouter(r.Group("/users"))
-
-    // Apply validation pipe
-    cr.POST("/", c.Create).
-        Guard(AuthGuard()).
-        Pipe(ValidationPipe())
-
-    // Multiple pipes - executed in order
-    cr.PUT("/:id", c.Update).
-        Guard(AuthGuard()).
-        Pipe(ParseIntPipe("id"), ValidationPipe())
+    cr.POST("", c.Create).
+        Pipe(ligo.ValidationPipe(&CreateUserInput{})).
+        Handle()
 }
 ```
 
-## Common Pipe Patterns
+`ValidatedBody[T]` panics with a clear message if `ValidationPipe` was not added to the route — catching misconfigurations at startup rather than silently returning nil.
 
-### Validation Pipe
+### ParseIntPipe
+
+Parses a path parameter as `int` and stores it in context under the parameter name:
 
 ```go
-func ValidationPipe[T any]() Pipe {
-    return func(input any) (any, error) {
-        data, ok := input.(T)
-        if !ok {
-            return nil, errors.New("invalid type")
-        }
+func (c *UserController) GetByID(ctx ligo.Context) error {
+    id := ctx.Get("id").(int)
+    // ...
+}
 
-        if err := validator.Validate(data); err != nil {
-            return nil, err
-        }
+cr.GET("/:id", c.GetByID).Pipe(ligo.ParseIntPipe("id")).Handle()
+```
 
-        return data, nil
+### ParseBoolPipe
+
+Parses a path parameter as `bool`:
+
+```go
+cr.GET("/:active", c.List).Pipe(ligo.ParseBoolPipe("active")).Handle()
+```
+
+### UUIDPipe
+
+Validates that a path parameter is a valid UUID:
+
+```go
+cr.GET("/:id", c.Get).Pipe(ligo.UUIDPipe("id")).Handle()
+```
+
+### TrimPipe
+
+Trims whitespace from a query or body field:
+
+```go
+cr.POST("", c.Create).
+    Pipe(ligo.TrimPipe("name"), ligo.TrimPipe("email")).
+    Pipe(ligo.ValidationPipe(&CreateUserInput{})).
+    Handle()
+```
+
+## Chaining Pipes
+
+Pipes execute in the order specified:
+
+```go
+cr.PUT("/:id", c.Update).
+    Pipe(ligo.ParseIntPipe("id")).
+    Pipe(ligo.ValidationPipe(&UpdateUserInput{})).
+    Handle()
+```
+
+## Custom Pipes
+
+```go
+func PositiveIntPipe(param string) ligo.Pipe {
+    return func(ctx ligo.Context) (any, error) {
+        str := ctx.Param(param)
+        n, err := strconv.Atoi(str)
+        if err != nil || n <= 0 {
+            return nil, fmt.Errorf("param %q must be a positive integer", param)
+        }
+        ctx.Set(param, n)
+        return n, nil
     }
 }
-```
-
-### Transform Pipe
-
-```go
-func TrimSpacePipe() Pipe {
-    return func(input any) (any, error) {
-        if str, ok := input.(string); ok {
-            return strings.TrimSpace(str), nil
-        }
-        return input, nil
-    }
-}
-```
-
-### Parsing Pipe
-
-```go
-func ParseIntPipe() Pipe {
-    return func(input any) (any, error) {
-        if str, ok := input.(string); ok {
-            num, err := strconv.Atoi(str)
-            if err != nil {
-                return nil, err
-            }
-            return num, nil
-        }
-        return input, nil
-    }
-}
-```
-
-## Pipe Execution
-
-Pipes execute in the order specified, transforming the data sequentially:
-
-```go
-// Execution flow: original -> Trim -> ParseInt -> Validate -> handler
-cr.POST("/data", c.Create).
-    Pipe(TrimSpacePipe(), ParseIntPipe(), ValidationPipe())
-```
-
-## Error Handling
-
-If a pipe returns an error, the chain stops and the error is returned:
-
-```go
-func ValidationPipe() Pipe {
-    return func(input any) (any, error) {
-        if invalid {
-            return nil, errors.New("validation failed")
-        }
-        return input, nil
-    }
-}
-
-// The handler won't be called if validation fails
-cr.POST("/", c.Create).Pipe(ValidationPipe())
 ```

@@ -155,12 +155,8 @@ type CreateUserInput struct {
 }
 
 func (c *Controller) Create(ctx ligo.Context) error {
-    var input CreateUserInput
-    if err := ctx.Bind(&input); err != nil {
-        return err
-    }
-    // Input is validated by the pipe
-    user, err := c.service.Create(input)
+    input := ligo.ValidatedBody[CreateUserInput](ctx)
+    user, err := c.service.Create(*input)
     if err != nil {
         return err
     }
