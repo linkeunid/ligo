@@ -229,8 +229,9 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - `JSON(code, v)` - Send JSON response
 - `String(code, s)` - Send string response
 - `Set/Get(key, val)` - Request-scoped data storage
-- `OK(v), Created(v), NoContent()` - HTTP response helpers
-- `BadRequest/Unauthorized/Forbidden/NotFound(msg)` - Error responses
+- `OK(v), Created(v), Accepted(v), NoContent()` - HTTP response helpers
+- `BadRequest/Unauthorized/Forbidden/NotFound/MethodNotAllowed/NotAcceptable/RequestTimeout/Conflict/Gone/PreconditionFailed/PayloadTooLarge/UnsupportedMediaType/UnprocessableEntity/TooManyRequests/ImATeapot(msg ...string)` - 4xx error responses
+- `InternalServerError/NotImplemented/BadGateway/ServiceUnavailable/GatewayTimeout/HTTPVersionNotSupported(msg ...string)` - 5xx error responses
 - `Stream(reader)` - Stream file download
 
 ## Built-in Utilities

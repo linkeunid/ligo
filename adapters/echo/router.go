@@ -204,8 +204,12 @@ func (ca *contextAdapter) GetRequestContainer() *container.Container {
 
 // HTTP response helpers
 
-func (ca *contextAdapter) errorResponse(code int, msg string) error {
-	return ca.c.JSON(code, map[string]string{errorMsgKey: msg})
+func (ca *contextAdapter) errorResponse(code int, msg ...string) error {
+	m := http.StatusText(code)
+	if len(msg) > 0 && msg[0] != "" {
+		m = msg[0]
+	}
+	return ca.c.JSON(code, map[string]string{errorMsgKey: m})
 }
 
 func (ca *contextAdapter) OK(v any) error {
@@ -216,32 +220,96 @@ func (ca *contextAdapter) Created(v any) error {
 	return ca.c.JSON(http.StatusCreated, v)
 }
 
+func (ca *contextAdapter) Accepted(v any) error {
+	return ca.c.JSON(http.StatusAccepted, v)
+}
+
 func (ca *contextAdapter) NoContent() error {
 	return ca.c.String(http.StatusNoContent, "")
 }
 
-func (ca *contextAdapter) BadRequest(msg string) error {
-	return ca.errorResponse(http.StatusBadRequest, msg)
+func (ca *contextAdapter) BadRequest(msg ...string) error {
+	return ca.errorResponse(http.StatusBadRequest, msg...)
 }
 
-func (ca *contextAdapter) Unauthorized(msg string) error {
-	return ca.errorResponse(http.StatusUnauthorized, msg)
+func (ca *contextAdapter) Unauthorized(msg ...string) error {
+	return ca.errorResponse(http.StatusUnauthorized, msg...)
 }
 
-func (ca *contextAdapter) Forbidden(msg string) error {
-	return ca.errorResponse(http.StatusForbidden, msg)
+func (ca *contextAdapter) Forbidden(msg ...string) error {
+	return ca.errorResponse(http.StatusForbidden, msg...)
 }
 
-func (ca *contextAdapter) NotFound(msg string) error {
-	return ca.errorResponse(http.StatusNotFound, msg)
+func (ca *contextAdapter) NotFound(msg ...string) error {
+	return ca.errorResponse(http.StatusNotFound, msg...)
 }
 
-func (ca *contextAdapter) Conflict(msg string) error {
-	return ca.errorResponse(http.StatusConflict, msg)
+func (ca *contextAdapter) MethodNotAllowed(msg ...string) error {
+	return ca.errorResponse(http.StatusMethodNotAllowed, msg...)
 }
 
-func (ca *contextAdapter) InternalServerError(msg string) error {
-	return ca.errorResponse(http.StatusInternalServerError, msg)
+func (ca *contextAdapter) NotAcceptable(msg ...string) error {
+	return ca.errorResponse(http.StatusNotAcceptable, msg...)
+}
+
+func (ca *contextAdapter) RequestTimeout(msg ...string) error {
+	return ca.errorResponse(http.StatusRequestTimeout, msg...)
+}
+
+func (ca *contextAdapter) Conflict(msg ...string) error {
+	return ca.errorResponse(http.StatusConflict, msg...)
+}
+
+func (ca *contextAdapter) Gone(msg ...string) error {
+	return ca.errorResponse(http.StatusGone, msg...)
+}
+
+func (ca *contextAdapter) PreconditionFailed(msg ...string) error {
+	return ca.errorResponse(http.StatusPreconditionFailed, msg...)
+}
+
+func (ca *contextAdapter) PayloadTooLarge(msg ...string) error {
+	return ca.errorResponse(http.StatusRequestEntityTooLarge, msg...)
+}
+
+func (ca *contextAdapter) UnsupportedMediaType(msg ...string) error {
+	return ca.errorResponse(http.StatusUnsupportedMediaType, msg...)
+}
+
+func (ca *contextAdapter) UnprocessableEntity(msg ...string) error {
+	return ca.errorResponse(http.StatusUnprocessableEntity, msg...)
+}
+
+func (ca *contextAdapter) TooManyRequests(msg ...string) error {
+	return ca.errorResponse(http.StatusTooManyRequests, msg...)
+}
+
+func (ca *contextAdapter) ImATeapot(msg ...string) error {
+	return ca.errorResponse(http.StatusTeapot, msg...)
+}
+
+func (ca *contextAdapter) InternalServerError(msg ...string) error {
+	return ca.errorResponse(http.StatusInternalServerError, msg...)
+}
+
+func (ca *contextAdapter) NotImplemented(msg ...string) error {
+	return ca.errorResponse(http.StatusNotImplemented, msg...)
+}
+
+func (ca *contextAdapter) BadGateway(msg ...string) error {
+	return ca.errorResponse(http.StatusBadGateway, msg...)
+}
+
+func (ca *contextAdapter) ServiceUnavailable(msg ...string) error {
+	return ca.errorResponse(http.StatusServiceUnavailable, msg...)
+}
+
+func (ca *contextAdapter) GatewayTimeout(msg ...string) error {
+	return ca.errorResponse(http.StatusGatewayTimeout, msg...)
+}
+
+func (ca *contextAdapter) HTTPVersionNotSupported(msg ...string) error {
+	return ca.errorResponse(http.StatusHTTPVersionNotSupported, msg...)
 }
 
 func (ca *contextAdapter) Stream(reader any) error {

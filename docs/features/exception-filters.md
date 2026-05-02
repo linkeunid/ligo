@@ -62,7 +62,7 @@ func HttpExceptionFilter(err error, ctx ligo.Context) error {
     if err == nil {
         return nil
     }
-    return ctx.JSON(500, map[string]string{"error": err.Error()})
+    return ctx.InternalServerError(err.Error())
 }
 ```
 
@@ -71,7 +71,7 @@ func HttpExceptionFilter(err error, ctx ligo.Context) error {
 ```go
 func UnauthorizedFilter(err error, ctx ligo.Context) error {
     if err != nil && err.Error() == "guard denied access" {
-        return ctx.JSON(401, map[string]string{"error": "Unauthorized"})
+        return ctx.Unauthorized()
     }
     return err // Pass to next filter
 }
@@ -96,10 +96,10 @@ func ValidationErrorFilter(err error, ctx ligo.Context) error {
     switch {
     case errors.Is(err, ligo.ErrBadRequest):
         // Pipe parameter parsing failed (UUIDPipe, ParseIntPipe, etc.)
-        return ctx.JSON(400, map[string]string{"error": "Bad Request"})
+        return ctx.BadRequest(err.Error())
     case errors.As(err, &ve):
         // ValidationPipe struct tag validation failed
-        return ctx.JSON(422, map[string]string{"error": "Unprocessable Entity"})
+        return ctx.UnprocessableEntity(err.Error())
     }
     return err // Pass to next filter
 }
@@ -114,12 +114,12 @@ Detect it with `errors.Is`:
 
 ```go
 case errors.Is(err, ligo.ErrBadRequest):
-    return ctx.JSON(400, map[string]string{"error": "Bad Request"})
+    return ctx.BadRequest(err.Error())
 ```
 
 `ValidationPipe` also wraps `ligo.ErrBadRequest` on bind failures, but produces a
 `validator.ValidationErrors` on struct tag failures — check `errors.As` for that case
-and map it to 422 (Unprocessable Entity).
+and map it to 422 with `ctx.UnprocessableEntity`.
 
 ### Custom Error Types
 
@@ -135,9 +135,7 @@ func (e *NotFoundError) Error() string {
 
 func NotFoundFilter(err error, ctx ligo.Context) error {
     if notFound, ok := err.(*NotFoundError); ok {
-        return ctx.JSON(404, map[string]string{
-            "error": fmt.Sprintf("%s not found", notFound.Resource),
-        })
+        return ctx.NotFound(fmt.Sprintf("%s not found", notFound.Resource))
     }
     return err
 }

@@ -37,12 +37,28 @@ type Context interface {
 	// HTTP response helpers
 	OK(v any) error
 	Created(v any) error
+	Accepted(v any) error
 	NoContent() error
-	BadRequest(msg string) error
-	Unauthorized(msg string) error
-	Forbidden(msg string) error
-	NotFound(msg string) error
-	Conflict(msg string) error
-	InternalServerError(msg string) error
+	BadRequest(msg ...string) error
+	Unauthorized(msg ...string) error
+	Forbidden(msg ...string) error
+	NotFound(msg ...string) error
+	MethodNotAllowed(msg ...string) error
+	NotAcceptable(msg ...string) error
+	RequestTimeout(msg ...string) error
+	Conflict(msg ...string) error
+	Gone(msg ...string) error
+	PreconditionFailed(msg ...string) error
+	PayloadTooLarge(msg ...string) error
+	UnsupportedMediaType(msg ...string) error
+	UnprocessableEntity(msg ...string) error
+	TooManyRequests(msg ...string) error
+	ImATeapot(msg ...string) error
+	InternalServerError(msg ...string) error
+	NotImplemented(msg ...string) error
+	BadGateway(msg ...string) error
+	ServiceUnavailable(msg ...string) error
+	GatewayTimeout(msg ...string) error
+	HTTPVersionNotSupported(msg ...string) error
 	Stream(reader any) error
 }

@@ -50,6 +50,52 @@ The `Context` interface provides access to request and response:
 | `Set(key string, val any)` | Set request-scoped value |
 | `Get(key string) any` | Get request-scoped value |
 
+## Response Helpers
+
+Prefer these over raw `ctx.JSON` — they encode the status code in the name and keep handlers readable.
+
+### 2xx Success
+
+| Method | Status |
+|--------|--------|
+| `ctx.OK(v)` | 200 |
+| `ctx.Created(v)` | 201 |
+| `ctx.Accepted(v)` | 202 |
+| `ctx.NoContent()` | 204 |
+
+### 4xx Client Errors
+
+The `msg` argument is optional — omit it to use the standard HTTP status text.
+
+| Method | Status |
+|--------|--------|
+| `ctx.BadRequest(msg?)` | 400 |
+| `ctx.Unauthorized(msg?)` | 401 |
+| `ctx.Forbidden(msg?)` | 403 |
+| `ctx.NotFound(msg?)` | 404 |
+| `ctx.MethodNotAllowed(msg?)` | 405 |
+| `ctx.NotAcceptable(msg?)` | 406 |
+| `ctx.RequestTimeout(msg?)` | 408 |
+| `ctx.Conflict(msg?)` | 409 |
+| `ctx.Gone(msg?)` | 410 |
+| `ctx.PreconditionFailed(msg?)` | 412 |
+| `ctx.PayloadTooLarge(msg?)` | 413 |
+| `ctx.UnsupportedMediaType(msg?)` | 415 |
+| `ctx.UnprocessableEntity(msg?)` | 422 |
+| `ctx.TooManyRequests(msg?)` | 429 |
+| `ctx.ImATeapot(msg?)` | 418 |
+
+### 5xx Server Errors
+
+| Method | Status |
+|--------|--------|
+| `ctx.InternalServerError(msg?)` | 500 |
+| `ctx.NotImplemented(msg?)` | 501 |
+| `ctx.BadGateway(msg?)` | 502 |
+| `ctx.ServiceUnavailable(msg?)` | 503 |
+| `ctx.GatewayTimeout(msg?)` | 504 |
+| `ctx.HTTPVersionNotSupported(msg?)` | 505 |
+
 ## Handler Examples
 
 ### JSON Response
@@ -59,9 +105,9 @@ func (c *UserController) Get(ctx ligo.Context) error {
     id := ctx.Param("id")
     user, err := c.svc.Find(id)
     if err != nil {
-        return ctx.JSON(404, map[string]string{"error": "not found"})
+        return ctx.NotFound("user not found")
     }
-    return ctx.JSON(200, user)
+    return ctx.OK(user)
 }
 ```
 
@@ -76,15 +122,15 @@ type CreateUserRequest struct {
 func (c *UserController) Create(ctx ligo.Context) error {
     var req CreateUserRequest
     if err := ctx.Bind(&req); err != nil {
-        return ctx.JSON(400, map[string]string{"error": err.Error()})
+        return ctx.BadRequest(err.Error())
     }
 
     user, err := c.svc.Create(req)
     if err != nil {
-        return ctx.JSON(500, map[string]string{"error": err.Error()})
+        return ctx.InternalServerError(err.Error())
     }
 
-    return ctx.JSON(201, user)
+    return ctx.Created(user)
 }
 ```
 
@@ -101,7 +147,7 @@ func (c *HealthController) Check(ctx ligo.Context) error {
 ```go
 func (c *UserController) Current(ctx ligo.Context) error {
     user := ctx.Get("user").(*User) // Set by middleware
-    return ctx.JSON(200, user)
+    return ctx.OK(user)
 }
 ```
 
