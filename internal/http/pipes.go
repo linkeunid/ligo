@@ -1,12 +1,17 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
+
+// ErrBadRequest is the sentinel error wrapped by pipes when client input is invalid.
+// Exception handlers can detect it with errors.Is(err, ligo.ErrBadRequest).
+var ErrBadRequest = errors.New("bad request")
 
 var validate = validator.New()
 
@@ -24,10 +29,10 @@ func ValidationPipe[T any](_ *T) Pipe {
 	return func(ctx Context) error {
 		var input T
 		if err := ctx.Bind(&input); err != nil {
-			return fmt.Errorf("validation pipe: bind failed: %w", err)
+			return fmt.Errorf("validation pipe: bind failed: %w", errors.Join(err, ErrBadRequest))
 		}
 		if err := validate.Struct(input); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
+			return fmt.Errorf("validation failed: %w", errors.Join(err, ErrBadRequest))
 		}
 		ctx.Set(ValidatedBodyKey, &input)
 		return nil
@@ -54,7 +59,7 @@ func ParseIntPipe(param string) Pipe {
 		str := ctx.Param(param)
 		i, err := strconv.Atoi(str)
 		if err != nil {
-			return fmt.Errorf("parse int pipe: param %q is not a valid integer", param)
+			return fmt.Errorf("parse int pipe: param %q is not a valid integer: %w", param, ErrBadRequest)
 		}
 		ctx.Set(param, i)
 		return nil
@@ -69,7 +74,7 @@ func ParseBoolPipe(param string) Pipe {
 		str := ctx.Param(param)
 		b, err := strconv.ParseBool(str)
 		if err != nil {
-			return fmt.Errorf("parse bool pipe: param %q is not a valid boolean", param)
+			return fmt.Errorf("parse bool pipe: param %q is not a valid boolean: %w", param, ErrBadRequest)
 		}
 		ctx.Set(param, b)
 		return nil
@@ -82,7 +87,7 @@ func UUIDPipe(param string) Pipe {
 	return func(ctx Context) error {
 		str := ctx.Param(param)
 		if err := validate.Var(str, "uuid"); err != nil {
-			return fmt.Errorf("uuid pipe: param %q must be a valid UUID", param)
+			return fmt.Errorf("uuid pipe: param %q must be a valid UUID: %w", param, ErrBadRequest)
 		}
 		ctx.Set(param, str)
 		return nil
