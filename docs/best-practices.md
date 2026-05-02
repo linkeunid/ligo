@@ -293,6 +293,39 @@ cr.PUT("/:id", c.Update).
     Handle()
 ```
 
+### Do Not Use ValidationPipe Twice on the Same Route
+
+`ValidationPipe[T]` reads the HTTP body via `ctx.Bind`. The body stream can only be read once, so a second `ValidationPipe` on the same route receives an empty body. Both would also overwrite each other's context value.
+
+Instead, use a single composite DTO:
+
+```go
+// Wrong: body consumed on first pipe, second gets nothing
+cr.POST("", c.Create).
+    Pipe(ligo.ValidationPipe(&dto.CreateUserInput{})).
+    Pipe(ligo.ValidationPipe(&dto.ExtraInput{})).
+    Handle()
+
+// Right: one composite DTO covers all fields
+type CreateUserInput struct {
+    dto.BaseUserInput
+    Role string `json:"role" validate:"required"`
+}
+
+cr.POST("", c.Create).
+    Pipe(ligo.ValidationPipe(&dto.CreateUserInput{})).
+    Handle()
+```
+
+For path params alongside body validation, use `ParseIntPipe` / `UUIDPipe` before `ValidationPipe` — they read from the path, not the body:
+
+```go
+cr.PUT("/:id", c.Update).
+    Pipe(ligo.ParseIntPipe("id")).
+    Pipe(ligo.ValidationPipe(&dto.UpdateUserInput{})).
+    Handle()
+```
+
 ## Interceptors
 
 ### Use Interceptors for Cross-Cutting Concerns

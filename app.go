@@ -111,7 +111,7 @@ func (a *App) Run() error {
 
 	a.opts.logger.Info("Starting ligo application", logger.Field{Key: "context", Value: logger.ContextApp})
 
-	root := container.New()
+	root := container.New(a.opts.logger)
 
 	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
 	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true))

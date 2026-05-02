@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/linkeunid/ligo/internal/core/logger"
@@ -149,6 +150,12 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 			// no match — fall through to parent/missing
 		case 1:
 			entry, ok, typ = matchEntry, true, matchType
+			if c.logger != nil {
+				c.logger.LogWithContext(logger.ContextDIContainer, "Interface resolved",
+					logger.Field{Key: "interface", Value: requestedTyp.String()},
+					logger.Field{Key: "concrete", Value: matchType.String()},
+				)
+			}
 		default:
 			return nil, &ErrAmbiguousDependency{Interface: typ.String(), Implementors: implementors}
 		}
@@ -203,6 +210,19 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 
 	// Factory with auto-injection
 	if entry.factory != nil {
+		if c.logger != nil {
+			depNames := make([]string, len(entry.argTypes))
+			for i, t := range entry.argTypes {
+				depNames[i] = t.String()
+			}
+			deps := "-"
+			if len(depNames) > 0 {
+				deps = strings.Join(depNames, ", ")
+			}
+			c.logger.LogWithContext(logger.ContextDIContainer, "Constructing "+typ.String(),
+				logger.Field{Key: "deps", Value: deps},
+			)
+		}
 		newChain := append(chain, typ)
 		args := make([]reflect.Value, len(entry.argTypes))
 		for i, argType := range entry.argTypes {

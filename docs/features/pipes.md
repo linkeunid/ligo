@@ -92,6 +92,55 @@ cr.PUT("/:id", c.Update).
     Handle()
 ```
 
+Multiple pipes can also be passed to a single `.Pipe()` call:
+
+```go
+cr.PUT("/:id", c.Update).
+    Pipe(ligo.ParseIntPipe("id"), ligo.ValidationPipe(&UpdateUserInput{})).
+    Handle()
+```
+
+## Validating Multiple DTOs
+
+**Do not call `ValidationPipe` twice on the same route.** Each call reads the HTTP request body via `ctx.Bind` — the body stream can only be read once, so the second call gets an empty body. Both calls also store under the same context key, so the second would overwrite the first.
+
+**Wrong:**
+
+```go
+cr.POST("", c.Create).
+    Pipe(ligo.ValidationPipe(&dto.CreateUserInput{})).
+    Pipe(ligo.ValidationPipe(&dto.ExtraInput{})).   // body already consumed
+    Handle()
+```
+
+**Right — use a single composite DTO:**
+
+```go
+type CreateUserInput struct {
+    dto.BaseUserInput                               // embed shared fields
+    Role string `json:"role" validate:"required"`
+}
+
+cr.POST("", c.Create).
+    Pipe(ligo.ValidationPipe(&CreateUserInput{})).
+    Handle()
+```
+
+**Right — combine path param extraction with body validation:**
+
+```go
+cr.PUT("/:id", c.Update).
+    Pipe(ligo.ParseIntPipe("id")).                  // path param → ctx.Get("id").(int)
+    Pipe(ligo.ValidationPipe(&dto.UpdateUserInput{})).
+    Handle()
+
+func (c *UserController) Update(ctx ligo.Context) error {
+    id := ctx.Get("id").(int)
+    input := ligo.ValidatedBody[dto.UpdateUserInput](ctx)
+    // ...
+}
+```
+
 ## Custom Pipes
 
 ```go
