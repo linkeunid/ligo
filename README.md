@@ -4,9 +4,9 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.25.9-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Status](https://img.shields.io/badge/status-beta-yellow)](https://github.com/linkeunid/ligo)
+[![Status](https://img.shields.io/badge/status-0.9%20beta-yellow)](https://github.com/linkeunid/ligo)
 
-> **Note:** Ligo is in **beta** (v0.7). It has Guards, Pipes, Interceptors, and Exception Filters with a Go-idiomatic builder pattern.
+> **Note:** Ligo is at **v0.9** beta. Production-ready with Guards, Pipes, Interceptors, Exception Filters, and HTTP response helpers.
 
 ## Features
 
@@ -76,11 +76,28 @@ func (c *helloController) Routes(r ligo.Router) {
 - [Exception Filters](docs/features/exception-filters.md) - Error handling and HTTP response conversion
 - [DI Container](docs/features/di-container.md) - How the DI container works
 
+## Roadmap
+
+- **Current Version:** 0.9 - Production ready with all core features
+- **In Development:** `github.com/linkeunid/ligo/microservices` - RabbitMQ-based microservices (message queue, RPC, event-driven architecture)
+
+See [Roadmaps](docs/roadmaps/) for:
+  - [Package Ecosystem](docs/roadmaps/ecosystem.md) - Separate packages for DB, microservices, etc.
+  - [1.0 Release Plan](docs/roadmaps/1.0-release.md) - Timeline to production release
+  - [Future Features](docs/roadmaps/future-features.md) - WebSocket, GraphQL, Scheduling
+  - [Adapter Proposals](docs/roadmaps/adapter-proposals.md) - Fiber, Gin, Chi adapters
+
 ## Examples
 
 See the [ligo-boilerplate](https://github.com/linkeunid/ligo-boilerplate) repository for complete examples:
-- Basic API example
-- Full modular example with Guards, Pipes, Interceptors, and Exception Filters
+- **REST API** - Full CRUD operations with response helpers
+- **Authentication** - JWT-style auth with guards and role-based access
+- **Authorization** - Custom guards, roles guard, admin-only endpoints
+- **File Upload** - Multipart file upload with streaming downloads
+
+See [Examples Guide](docs/examples.md) for detailed documentation and API usage.
+
+**Note:** Database integration and microservices will be provided as separate packages (like `@nestjs/typeorm` and `@nestjs/microservices`). See [Package Ecosystem](docs/roadmaps/ecosystem.md).
 
 ## License
 

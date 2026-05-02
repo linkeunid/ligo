@@ -240,3 +240,13 @@ func (ca *contextAdapter) Conflict(msg string) error {
 func (ca *contextAdapter) InternalServerError(msg string) error {
 	return ca.errorResponse(http.StatusInternalServerError, msg)
 }
+
+func (ca *contextAdapter) Stream(reader any) error {
+	r, ok := reader.(io.ReadCloser)
+	if !ok {
+		return ca.c.JSON(http.StatusBadRequest, map[string]string{errorMsgKey: "invalid reader"})
+	}
+	defer r.Close()
+
+	return ca.c.Stream(http.StatusOK, "", r)
+}

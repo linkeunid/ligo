@@ -39,6 +39,14 @@ go fmt ./...
 go mod tidy
 ```
 
+## Documentation
+
+**User-facing docs:**
+- [README.md](../README.md) - Project overview and quick start
+- [docs/features/](../docs/features/) - Detailed feature documentation
+- [docs/examples.md](../docs/examples.md) - Examples guide with API usage
+- [docs/roadmaps/](../docs/roadmaps/) - Release roadmap and future proposals
+
 ## Architecture
 
 ```
@@ -62,13 +70,15 @@ ligo/
 │   │   ├── binder.go       # Controller registration with DI
 │   │   ├── builder.go      # RouteBuilder for chain pattern
 │   │   ├── chain.go        # ChainRouter for fluent API
-│   │   ├── context.go      # Context interface
+│   │   ├── context.go      # Context interface (with Stream method)
 │   │   └── router.go       # Router interface
 │   ├── testing/            # Test helpers
 │   └── adapters/           # Concrete implementations
 │       └── echo/           # Echo v5 adapter
 └── docs/
-    └── features/           # Feature documentation
+    ├── examples.md          # Examples guide
+    ├── features/           # Feature documentation
+    └── roadmaps/           # Release roadmap and future proposals
 ```
 
 ### Structure Principles
@@ -153,3 +163,22 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - Guards, Pipes, Interceptors, and Exception Filters use Go-idiomatic builder pattern (no decorators)
 - Logger is automatically registered as a provider and injectable
 - No hardcoded string keys or fmt.Printf in core code - use structured logging
+
+## Context Interface Methods
+
+- `Request()` - Get HTTP request
+- `Response()` - Get HTTP response writer
+- `Param(key)` - Get path parameter
+- `Bind(v)` - Bind request body to struct
+- `JSON(code, v)` - Send JSON response
+- `String(code, s)` - Send string response
+- `Set/Get(key, val)` - Request-scoped data storage
+- `OK(v), Created(v), NoContent()` - HTTP response helpers
+- `BadRequest/Unauthorized/Forbidden/NotFound(msg)` - Error responses
+- `Stream(reader)` - Stream file download
+
+## Built-in Utilities
+
+**Guards:** `RolesGuard`, `AdminGuard`, `ThrottleGuard`
+**Pipes:** `ValidationPipe`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`
+**Interceptors:** `TimeoutInterceptor`, `LoggingInterceptor`

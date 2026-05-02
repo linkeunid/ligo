@@ -44,4 +44,5 @@ type Context interface {
 	NotFound(msg string) error
 	Conflict(msg string) error
 	InternalServerError(msg string) error
+	Stream(reader any) error
 }
