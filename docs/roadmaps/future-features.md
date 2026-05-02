@@ -6,47 +6,54 @@ Features that could be added as separate packages/modules post-1.0.
 
 ## 🚧 In Development
 
-### Microservices (RabbitMQ)
-**Status:** In Development
+### Microservices
+**Status:** Design Complete, Implementation Pending
 **Package:** `github.com/linkeunid/ligo/microservices`
+**Documentation:** [Microservices Guide](../microservices.md)
 
 **Features:**
-- RabbitMQ transport layer
-- Message producer/consumer patterns
-- RPC patterns over message queue
+- Transport layer abstractions (TCP, Redis, RabbitMQ, Kafka, NATS)
+- Message broker interface
+- Request/Response patterns
+- Pub/Sub patterns
 - Event-driven architecture
-- Service discovery (Consul, etcd)
-- Circuit breaker for resilience
+- Client and Server abstractions
+
+**Key Concepts:**
+
+The microservices package follows the same patterns as NestJS `@nestjs/microservices`:
+
+1. **Broker Interface** - Abstraction over message brokers (Redis, RabbitMQ, Kafka)
+2. **Transport Layer** - Different transport implementations
+3. **Server/Client** - Microservice server and client abstractions
+4. **Message Patterns** - Request/Response, Pub/Sub, Event-driven
+
+**Example: Dynamic Microservice Module**
+
+Similar to NestJS, you can create dynamic microservice modules:
 
 ```go
-// Proposed API
-func Module() ligo.Module {
-    return ligo.NewModule("order",
-        microservices.WithRabbitMQConsumer(
-            "order-events",
-            microservices.WithHandler(func(msg *amqp.Delivery) error {
-                // Handle order event
-                return processOrder(msg)
-            }),
-        ),
-        microservices.WithRabbitMQProducer(
-            "user-events",
+func RegisterMicroservice(config MicroserviceConfig) ligo.Module {
+    return ligo.NewModule("microservice",
+        ligo.Dynamic(
+            func(opts ...any) ligo.Module {
+                // Create module based on config
+                return CreateMicroserviceInstance(config)
+            },
+            config,
         ),
     )
 }
-
-// RPC over RabbitMQ
-func (s *OrderService) CreateUser(ctx context.Context, req *CreateUserRequest) (*CreateUserResponse, error) {
-    return s.userService.RPC("user-service.CreateUser", ctx, req)
-}
 ```
 
-**Implementation:**
-- RabbitMQ client wrapper with connection pooling
-- Message serialization/deserialization
-- Retry policies and dead letter queues
-- Health checks for consumer lag
-- Graceful shutdown for consumers
+**Implementation Guide:**
+See [Microservices Documentation](../microservices.md) for:
+- Architecture overview
+- Transport layer implementations
+- Usage examples
+- Comparison with NestJS
+- Best practices
+- Implementation roadmap
 
 **Reference:** [rabbitmq/amqp091-go](https://github.com/rabbitmq/amqp091-go)
 

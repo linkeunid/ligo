@@ -73,6 +73,9 @@ func (c *helloController) Routes(r ligo.Router) {
 - [Performance Tuning](docs/performance-tuning.md) - Optimization and profiling
 - [Deployment Guide](docs/deployment.md) - Docker, Kubernetes, Cloud platforms
 - [Stability Policy](docs/stability.md) - Versioning and backward compatibility
+- [Package Development](docs/package-development.md) - How to create new Ligo packages
+- [External Packages](docs/external-packages.md) - Creating third-party integration packages
+- [Microservices](docs/microservices.md) - Distributed systems with Ligo
 
 **Features:**
 - [App & Lifecycle](docs/features/app.md) - Application configuration and lifecycle hooks
@@ -90,12 +93,13 @@ func (c *helloController) Routes(r ligo.Router) {
 
 - **Current Version:** 1.0 ✅ (All requirements completed)
 - **Test Coverage:** 152 tests passing, 39.8% coverage
-- **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability)
-- **Next:** `github.com/linkeunid/ligo/microservices` - RabbitMQ-based microservices (message queue, RPC, event-driven architecture)
+- **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
+- **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 
 See [Roadmaps](docs/roadmaps/) for:
   - [1.0 Release Plan](docs/roadmaps/1.0-release.md) - Complete ✅
   - [Package Ecosystem](docs/roadmaps/ecosystem.md) - Separate packages for DB, microservices, etc.
+  - [Microservices Guide](docs/microservices.md) - How to build distributed systems with Ligo
   - [Future Features](docs/roadmaps/future-features.md) - WebSocket, GraphQL, Scheduling
   - [Adapter Proposals](docs/roadmaps/adapter-proposals.md) - Fiber, Gin, Chi adapters
 
@@ -109,7 +113,7 @@ See the [ligo-boilerplate](https://github.com/linkeunid/ligo-boilerplate) reposi
 
 See [Examples Guide](docs/examples.md) for detailed documentation and API usage.
 
-**Note:** Database integration and microservices will be provided as separate packages (like `@nestjs/typeorm` and `@nestjs/microservices`). See [Package Ecosystem](docs/roadmaps/ecosystem.md).
+**Note:** Database integration and microservices will be provided as separate packages (like `@nestjs/typeorm` and `@nestjs/microservices`). See [Microservices Guide](docs/microservices.md) for implementation details.
 
 ## License
 
