@@ -1,5 +1,9 @@
 package ligo
 
+// Package ligo provides a modular Go framework with lightweight dependency injection,
+// inspired by NestJS. It offers HTTP routing with an adapter pattern, a powerful DI container,
+// module system, and request processing with Guards, Pipes, Interceptors, and Exception Filters.
+
 import (
 	"fmt"
 	"reflect"
@@ -12,6 +16,8 @@ import (
 	"github.com/linkeunid/ligo/internal/http"
 )
 
+// App represents a Ligo application with dependency injection, module management,
+// and HTTP server capabilities.
 type App struct {
 	mu           sync.Mutex
 	started      bool
@@ -22,6 +28,15 @@ type App struct {
 	opts         options
 }
 
+// New creates a new Ligo application with the given options.
+// Options include WithRouter, WithAddr, WithMiddleware, OnStart, and OnStop.
+//
+// Example:
+//
+//	app := ligo.New(
+//	    ligo.WithRouter(echo.NewAdapter()),
+//	    ligo.WithAddr(":8080"),
+//	)
 func New(opts ...Option) *App {
 	op := defaultOptions()
 	for _, opt := range opts {
@@ -33,6 +48,16 @@ func New(opts ...Option) *App {
 	}
 }
 
+// Register registers one or more modules with the application.
+// Modules must be registered before calling Run().
+// Panics if called after the application has started.
+//
+// Example:
+//
+//	app.Register(
+//	    user.Module(),
+//	    auth.Module(),
+//	)
 func (a *App) Register(modules ...module.Module) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -44,6 +69,16 @@ func (a *App) Register(modules ...module.Module) {
 	a.modules = append(a.modules, modules...)
 }
 
+// Provide registers global providers that are available across all modules.
+// Providers must be registered before calling Run().
+// Panics if called after the application has started.
+//
+// Example:
+//
+//	app.Provide(
+//	    ligo.Value("config-value"),
+//	    ligo.Factory[*Config](NewConfig),
+//	)
 func (a *App) Provide(providers ...Provider) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -55,6 +90,16 @@ func (a *App) Provide(providers ...Provider) {
 	a.providers = append(a.providers, providers...)
 }
 
+// Run starts the HTTP server and blocks until the server is shut down.
+// It builds the DI container, registers all modules and providers,
+// executes OnModuleInit hooks, starts the server, and waits for shutdown.
+// On shutdown, it executes OnModuleDestroy and OnStop hooks.
+//
+// Example:
+//
+//	if err := app.Run(); err != nil {
+//	    log.Fatal(err)
+//	}
 func (a *App) Run() error {
 	a.mu.Lock()
 	if a.started {

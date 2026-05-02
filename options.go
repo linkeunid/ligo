@@ -1,5 +1,8 @@
 package ligo
 
+// Package ligo provides configuration options for the Ligo application,
+// including router, middleware, logging, and lifecycle hooks.
+
 import (
 	"time"
 
@@ -26,7 +29,9 @@ type Logger = logger.Logger
 type LoggerType = logger.Type
 
 const (
+	// LoggerText enables human-readable text logging.
 	LoggerText = logger.TypeText
+	// LoggerJSON enables structured JSON logging.
 	LoggerJSON = logger.TypeJSON
 )
 
@@ -34,6 +39,13 @@ const (
 type LoggerField = logger.Field
 
 // NewLogger creates a new logger. Default is text mode for development.
+//
+// Example:
+//
+//	logger := ligo.NewLogger(
+//	    ligo.WithLoggerJSON(),
+//	    ligo.WithLoggerDebug(),
+//	)
 func NewLogger(opts ...LoggerOption) Logger {
 	return logger.New(opts...)
 }
@@ -41,17 +53,17 @@ func NewLogger(opts ...LoggerOption) Logger {
 // LoggerOption configures the logger.
 type LoggerOption = logger.LoggerOption
 
-// WithLoggerText sets text output format.
+// WithLoggerText sets text output format (default).
 func WithLoggerText() LoggerOption {
 	return logger.WithText()
 }
 
-// WithLoggerJSON sets JSON output format.
+// WithLoggerJSON sets JSON output format for production.
 func WithLoggerJSON() LoggerOption {
 	return logger.WithJSON()
 }
 
-// WithLoggerProduction enables JSON logging.
+// WithLoggerProduction enables JSON logging (alias for WithLoggerJSON).
 func WithLoggerProduction() LoggerOption {
 	return logger.WithProduction()
 }
@@ -62,6 +74,7 @@ func WithLoggerDebug() LoggerOption {
 }
 
 // LifecycleHook is a function called during app lifecycle events.
+// The ctx parameter is context.Context for OnStart/OnStop hooks.
 type LifecycleHook func(ctx any) error
 
 // Option configures the App.
