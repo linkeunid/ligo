@@ -3,6 +3,11 @@
 # Default: patch
 set -euo pipefail
 
+if ! command -v gh &>/dev/null; then
+  echo "Error: gh CLI is not installed. See https://cli.github.com"
+  exit 1
+fi
+
 BUMP="${1:-patch}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -30,5 +35,7 @@ BRANCH="$(git -C "$DIR" branch --show-current)"
 git -C "$DIR" tag -a "$VERSION" -m "$VERSION"
 git -C "$DIR" push origin "$BRANCH"
 git -C "$DIR" push origin "$VERSION"
+
+gh release create "$VERSION" --repo linkeunid/ligo --title "$VERSION" --notes "" --latest
 
 echo "Released ligo $VERSION"

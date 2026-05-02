@@ -20,6 +20,7 @@ The script will:
 2. Increment the version
 3. Push the current branch
 4. Create and push the annotated tag
+5. Create a GitHub Release
 
 ## What gets published
 
