@@ -31,7 +31,11 @@ app := ligo.New(
 
 ## Lifecycle Hooks
 
-Lifecycle hooks run during application startup and shutdown:
+Ligo supports two types of lifecycle hooks:
+
+### Module-Level Hooks (Functional)
+
+Module-level hooks run during application startup and shutdown:
 
 ```go
 app := ligo.New(
@@ -48,6 +52,49 @@ app := ligo.New(
     }),
 )
 ```
+
+### Provider-Level Hooks (Interface-Based)
+
+Providers and controllers can implement lifecycle interfaces for more granular control:
+
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationBootstrap() error {
+    return s.db.Ping()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    return s.db.Close()
+}
+```
+
+**Available hooks:**
+- `OnModuleInit()` — Called when module initializes
+- `OnApplicationBootstrap()` — Called after all modules initialize, before serving
+- `OnApplicationShutdown()` — Called during shutdown
+- `OnModuleDestroy()` — Called when module destroys
+
+**Execution order:**
+1. Module-level `OnStart` hooks
+2. Provider `OnModuleInit` hooks (in registration order)
+3. Provider `OnApplicationBootstrap` hooks
+4. Application runs (HTTP server or signal wait)
+5. Provider `OnApplicationShutdown` hooks (reverse order)
+6. Provider `OnModuleDestroy` hooks (reverse order)
+7. Module-level `OnStop` hooks
+
+**Works for both HTTP and non-HTTP apps:** Bots, CLI runners, and background workers can use the same lifecycle hooks — just create the app without `WithRouter()`.
+
+See [Controllers](controllers.md#lifecycle-hooks) for detailed examples.
 
 ## Graceful Shutdown
 

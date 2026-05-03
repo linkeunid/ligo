@@ -162,3 +162,53 @@ func (c *UserController) Routes(r ligo.Router) {
     api.Handle("GET", "/users/:id", c.Get)
 }
 ```
+
+## Lifecycle Hooks
+
+Controllers and providers can implement lifecycle interfaces to run code at specific application stages:
+
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    return s.db.Close()
+}
+
+type UserController struct {
+    db *DatabaseService
+}
+
+func (c *UserController) Routes(r ligo.Router) {
+    r.Handle("GET", "/", func(ctx ligo.Context) error {
+        // c.db is already connected!
+        return ctx.OK(...)
+    })
+}
+
+app.Register(
+    ligo.NewModule("users",
+        ligo.Providers(
+            ligo.Factory[*DatabaseService](NewDatabaseService),
+        ),
+        ligo.Controllers(func(db *DatabaseService) ligo.Controller {
+            return &UserController{db: db}
+        }),
+    ),
+)
+```
+
+**Available hooks:**
+- `OnModuleInit` — Called when module initializes
+- `OnApplicationBootstrap` — Called after all modules initialize, before app serves
+- `OnApplicationShutdown` — Called during shutdown
+- `OnModuleDestroy` — Called when module destroys
+
+Hooks run in the same order for both HTTP and non-HTTP applications. The only difference is what happens between `OnApplicationBootstrap` and shutdown (HTTP server serves vs. waiting for signals).

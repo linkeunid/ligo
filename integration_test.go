@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -886,4 +887,161 @@ func TestDynamicModuleWithImports(t *testing.T) {
 	}
 
 	go func() { <-runErr }()
+}
+
+// lifecycleTracker tracks the order of hook execution.
+type lifecycleTracker struct {
+	mu    sync.Mutex
+	calls []string
+}
+
+// trackedProvider implements all 4 lifecycle hooks.
+type trackedProvider struct {
+	tracker *lifecycleTracker
+}
+
+func (p *trackedProvider) OnModuleInit() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "init")
+	return nil
+}
+
+func (p *trackedProvider) OnApplicationBootstrap() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "bootstrap")
+	return nil
+}
+
+func (p *trackedProvider) OnApplicationShutdown() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "shutdown")
+	return nil
+}
+
+func (p *trackedProvider) OnModuleDestroy() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "destroy")
+	return nil
+}
+
+// orderedProvider implements OnModuleInit with an ID for testing order.
+type orderedProvider struct {
+	id      string
+	tracker *lifecycleTracker
+}
+
+func (p *orderedProvider) OnModuleInit() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "init-"+p.id)
+	return nil
+}
+
+// TestLifecycleHooks tests the full lifecycle hook execution flow.
+func TestLifecycleHooks(t *testing.T) {
+
+	t.Run("non-HTTP mode executes all hooks", func(t *testing.T) {
+		tracker := &lifecycleTracker{calls: []string{}}
+
+		app := ligo.New()
+		app.Register(
+			ligo.NewModule("test",
+				ligo.Providers(
+					ligo.Value(&trackedProvider{tracker: tracker}),
+				),
+			),
+		)
+
+		// Run in background
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Run()
+		}()
+
+		// Give time for init and bootstrap hooks to execute
+		time.Sleep(200 * time.Millisecond)
+
+		// Send shutdown signal
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+
+		// Wait for shutdown
+		err := <-errCh
+		if err != nil {
+			t.Fatalf("app.Run() failed: %v", err)
+		}
+
+		// Verify hook execution order
+		tracker.mu.Lock()
+		calls := make([]string, len(tracker.calls))
+		copy(calls, tracker.calls)
+		tracker.mu.Unlock()
+
+		expected := []string{"init", "bootstrap", "shutdown", "destroy"}
+		if len(calls) != len(expected) {
+			t.Fatalf("got %d calls, expected %d. Calls: %v", len(calls), len(expected), calls)
+		}
+		for i, call := range expected {
+			if calls[i] != call {
+				t.Errorf("call %d: got %s, want %s", i, calls[i], call)
+			}
+		}
+	})
+
+	t.Run("hooks execute in registration order", func(t *testing.T) {
+		tracker := &lifecycleTracker{calls: []string{}}
+
+		app := ligo.New()
+		app.Register(
+			ligo.NewModule("test",
+				ligo.Providers(
+					ligo.Value(&orderedProvider{id: "first", tracker: tracker}),
+					ligo.Value(&orderedProvider{id: "second", tracker: tracker}),
+				),
+			),
+		)
+
+		// Run and shutdown
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Run()
+		}()
+
+		time.Sleep(200 * time.Millisecond)
+
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+
+		<-errCh
+
+		tracker.mu.Lock()
+		calls := make([]string, len(tracker.calls))
+		copy(calls, tracker.calls)
+		tracker.mu.Unlock()
+
+		// Should have init-first before init-second
+		foundFirst, foundSecond := false, false
+		for _, call := range calls {
+			if call == "init-first" {
+				foundFirst = true
+				if foundSecond {
+					t.Error("init-first called after init-second")
+				}
+			}
+			if call == "init-second" {
+				foundSecond = true
+			}
+		}
+		if !foundFirst || !foundSecond {
+			t.Errorf("missing init calls. Got: %v", calls)
+		}
+	})
 }

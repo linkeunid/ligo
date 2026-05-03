@@ -495,6 +495,46 @@ func main() {
 }
 ```
 
+### Implement Provider-Level Hooks
+
+For service-level initialization and cleanup, implement lifecycle interfaces on your providers:
+
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationBootstrap() error {
+    // Verify connection before serving requests
+    return s.db.Ping()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    // Close connection gracefully
+    return s.db.Close()
+}
+```
+
+**When to use which:**
+- **Module-level hooks** (`ligo.OnModuleInit(fn)`) — One-time setup like migrations
+- **Provider-level hooks** (interface methods) — Service-specific initialization like DB connections
+- **App-level hooks** (`ligo.OnStart(fn)`) — Cross-cutting concerns like global logging setup
+
+**Execution order:**
+1. Module `OnModuleInit` functions
+2. Provider `OnModuleInit` methods
+3. Provider `OnApplicationBootstrap` methods
+4. App runs (HTTP or signals)
+5. Provider `OnApplicationShutdown` methods
+6. Provider `OnModuleDestroy` methods
+7. Module `OnModuleDestroy` functions
+
 ## Configuration
 
 ### Use Structured Config

@@ -45,7 +45,7 @@ type TestService struct{}
 func TestBuildProviderEntry(t *testing.T) {
 	t.Run("eager provider creates valid entry", func(t *testing.T) {
 		p := &mockProvider{eager: "test-value"}
-		entry := BuildProviderEntry(p)
+		entry, _ := BuildProviderEntry(p)
 
 		// Entry should be valid for container registration
 		c := container.New()
@@ -59,7 +59,7 @@ func TestBuildProviderEntry(t *testing.T) {
 
 	t.Run("factory provider creates valid entry", func(t *testing.T) {
 		p := &mockProvider{}
-		entry := BuildProviderEntry(p)
+		entry, _ := BuildProviderEntry(p)
 
 		// Entry should be valid for container registration
 		c := container.New()
@@ -73,7 +73,7 @@ func TestBuildProviderEntry(t *testing.T) {
 
 	t.Run("transient flag is preserved", func(t *testing.T) {
 		p := &mockProvider{isTransient: true, eager: "test"}
-		entry := BuildProviderEntry(p)
+		entry, _ := BuildProviderEntry(p)
 
 		c := container.New()
 		typ := reflect.TypeOf("string")
@@ -91,7 +91,7 @@ func TestBuildProviderEntry(t *testing.T) {
 
 	t.Run("exported flag is preserved", func(t *testing.T) {
 		p := &mockProvider{isExported: true, eager: "test"}
-		_ = BuildProviderEntry(p)
+		_, _ = BuildProviderEntry(p)
 		// Exported flag is used by BuildModule, tested there
 	})
 }

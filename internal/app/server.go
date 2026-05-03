@@ -51,6 +51,7 @@ type ServeOptions struct {
 	GracefulTimeout time.Duration
 	ModuleHooks     *ModuleHooks
 	OnStop          []func(any) error
+	AppShutdown     func() error
 }
 
 // ServeWithRetry attempts to start the server, incrementing the port on address-in-use errors.
@@ -118,14 +119,10 @@ func serveWithGracefulShutdownAt(addr string, opts ServeOptions) error {
 		ctx, cancel := context.WithTimeout(context.Background(), opts.GracefulTimeout)
 		defer cancel()
 
-		if opts.ModuleHooks != nil {
-			for i := len(opts.ModuleHooks.OnDestroy) - 1; i >= 0; i-- {
-				for j := len(opts.ModuleHooks.OnDestroy[i]) - 1; j >= 0; j-- {
-					if err := opts.ModuleHooks.OnDestroy[i][j](); err != nil {
-						if opts.Logger != nil {
-							opts.Logger.Error("OnModuleDestroy hook failed", logger.Field{Key: "error", Value: err})
-						}
-					}
+		if opts.AppShutdown != nil {
+			if err := opts.AppShutdown(); err != nil {
+				if opts.Logger != nil {
+					opts.Logger.Error("App shutdown failed", logger.Field{Key: "error", Value: err})
 				}
 			}
 		}

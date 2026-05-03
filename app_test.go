@@ -1,7 +1,9 @@
 package ligo
 
 import (
+	"os"
 	"testing"
+	"time"
 
 	"github.com/linkeunid/ligo/internal/core/container"
 )
@@ -45,7 +47,14 @@ func TestAppRunResolvesModules(t *testing.T) {
 		),
 	))
 
-	app.Run()
+	// Run app in background since it will wait for shutdown signal
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.Run()
+	}()
+
+	// Wait for app to start and build container
+	time.Sleep(100 * time.Millisecond)
 
 	if app.container == nil {
 		t.Fatal("expected container to be built after Run()")
@@ -55,14 +64,34 @@ func TestAppRunResolvesModules(t *testing.T) {
 	if svc.name != "svc" {
 		t.Fatalf("expected 'svc', got %s", svc.name)
 	}
+
+	// Send shutdown signal to stop the app
+	process, _ := os.FindProcess(os.Getpid())
+	_ = process.Signal(os.Interrupt)
+
+	// Wait for app to stop
+	<-errCh
 }
 
 func TestAppRunLocksApp(t *testing.T) {
 	app := New()
 	app.Register(NewModule("test"))
-	app.Run()
+
+	// Run app in background
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.Run()
+	}()
+
+	// Wait for app to start
+	time.Sleep(100 * time.Millisecond)
 
 	defer func() {
+		// Send shutdown signal to stop the app
+		process, _ := os.FindProcess(os.Getpid())
+		_ = process.Signal(os.Interrupt)
+		<-errCh
+
 		if r := recover(); r == nil {
 			t.Fatal("expected panic on Register after Run")
 		}
@@ -73,9 +102,22 @@ func TestAppRunLocksApp(t *testing.T) {
 
 func TestAppProvideLocksApp(t *testing.T) {
 	app := New()
-	app.Run()
+
+	// Run app in background
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.Run()
+	}()
+
+	// Wait for app to start
+	time.Sleep(100 * time.Millisecond)
 
 	defer func() {
+		// Send shutdown signal to stop the app
+		process, _ := os.FindProcess(os.Getpid())
+		_ = process.Signal(os.Interrupt)
+		<-errCh
+
 		if r := recover(); r == nil {
 			t.Fatal("expected panic on Provide after Run")
 		}
@@ -89,17 +131,38 @@ func TestAppContainerEscapeHatch(t *testing.T) {
 	app.Register(NewModule("test",
 		Providers(Value(&testSvc{name: "hatch"})),
 	))
-	app.Run()
+
+	// Run app in background
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.Run()
+	}()
+
+	// Wait for app to start
+	time.Sleep(100 * time.Millisecond)
 
 	c := app.Container()
 	if c == nil {
+		// Send shutdown signal before failing
+		process, _ := os.FindProcess(os.Getpid())
+		_ = process.Signal(os.Interrupt)
+		<-errCh
 		t.Fatal("expected container escape hatch")
 	}
 
 	svc := container.Resolve[*testSvc](c)
 	if svc.name != "hatch" {
+		// Send shutdown signal before failing
+		process, _ := os.FindProcess(os.Getpid())
+		_ = process.Signal(os.Interrupt)
+		<-errCh
 		t.Fatalf("expected 'hatch', got %s", svc.name)
 	}
+
+	// Send shutdown signal to stop the app
+	process, _ := os.FindProcess(os.Getpid())
+	_ = process.Signal(os.Interrupt)
+	<-errCh
 }
 
 func TestAppContainerPanicsBeforeRun(t *testing.T) {

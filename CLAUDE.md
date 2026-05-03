@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Run tests (181 tests passing, 48.9% coverage)
+# Run tests (208 tests passing, 48.9% coverage)
 go test ./...
 go test -v ./...
 
@@ -201,7 +201,7 @@ func (c *Controller) Get(ctx ligo.Context) error {
 
 ## Testing
 
-- **181 tests passing** with 48.9% coverage
+- **208 tests passing** with 48.9% coverage
 - **Integration tests** (`integration_test.go`): Full app lifecycle, DI resolution, multiple modules, guards, pipes, interceptors
 - **Benchmarks** (`bench_test.go`): App creation, module creation, provider types, route registration, guards, pipes, interceptors
 - **Unit tests**: Comprehensive tests for internal packages (logger, module, lifecycle, resolver, container, app)
@@ -237,5 +237,34 @@ func (c *Controller) Get(ctx ligo.Context) error {
 ## Built-in Utilities
 
 **Guards:** `RolesGuard`, `AdminGuard`, `ThrottleGuard`
+**Pipes:** `ValidationPipe`, `ValidatedBody[T]`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`
+**Interceptors:** `TimeoutInterceptor`, `LoggingInterceptor`
+
+## Lifecycle Hooks
+
+Providers and controllers can implement lifecycle interfaces for initialization and cleanup:
+
+- `OnModuleInit() error` — Called when module initializes
+- `OnApplicationBootstrap() error` — Called after all modules initialize, before serving
+- `OnApplicationShutdown() error` — Called during shutdown
+- `OnModuleDestroy() error` — Called when module destroys
+
+Works for both HTTP and non-HTTP applications (bots, CLI runners). Hooks execute in registration order (reverse on shutdown).
+
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    return s.db.Close()
+}
+```
 **Pipes:** `ValidationPipe`, `ValidatedBody[T]`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`
 **Interceptors:** `TimeoutInterceptor`, `LoggingInterceptor`

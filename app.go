@@ -139,6 +139,24 @@ func (a *App) Run() error {
 		return err
 	}
 
+	// Execute provider OnModuleInit hooks
+	for _, hooks := range a.moduleHooks.Providers {
+		if hooks.OnInit != nil {
+			if err := hooks.OnInit(); err != nil {
+				return fmt.Errorf("OnModuleInit hook failed: %w", err)
+			}
+		}
+	}
+
+	// Execute provider OnApplicationBootstrap hooks
+	for _, hooks := range a.moduleHooks.Providers {
+		if hooks.OnBootstrap != nil {
+			if err := hooks.OnBootstrap(); err != nil {
+				return fmt.Errorf("OnApplicationBootstrap hook failed: %w", err)
+			}
+		}
+	}
+
 	if a.opts.router != nil {
 		if sc, ok := a.opts.router.(http.SetContainerRouter); ok {
 			sc.SetContainer(root)
@@ -177,8 +195,35 @@ func (a *App) Run() error {
 			GracefulTimeout: a.opts.gracefulTimeout,
 			ModuleHooks:     a.moduleHooks,
 			OnStop:          onStop,
+			AppShutdown:     a.shutdown,
 		})
+	} else {
+		// Non-HTTP mode: wait for shutdown signals
+		if err := app.WaitForShutdown(a.opts.logger); err != nil {
+			return err
+		}
+		return a.shutdown()
 	}
+}
+
+// shutdown executes OnApplicationShutdown and OnModuleDestroy hooks in reverse order.
+// Logs errors but continues executing remaining hooks.
+func (a *App) shutdown() error {
+	// Execute shutdown and destroy hooks in reverse order
+	for i := len(a.moduleHooks.Providers) - 1; i >= 0; i-- {
+		hooks := a.moduleHooks.Providers[i]
+		if hooks.OnShutdown != nil {
+			if err := hooks.OnShutdown(); err != nil {
+				a.opts.logger.Error("OnApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
+			}
+		}
+		if hooks.OnDestroy != nil {
+			if err := hooks.OnDestroy(); err != nil {
+				a.opts.logger.Error("OnModuleDestroy hook failed", logger.Field{Key: "error", Value: err})
+			}
+		}
+	}
+
 	return nil
 }
 

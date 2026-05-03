@@ -8,6 +8,7 @@ This document describes the example applications demonstrating Ligo framework fe
 - [REST API (CRUD Operations)](#1-rest-api-crud-operations-)
 - [Authentication/Authorization](#2-authenticationauthorization-)
 - [File Upload](#3-file-upload-)
+- [Lifecycle Hooks](#4-lifecycle-hooks-)
 - [Module Structure in Examples](#module-structure-in-examples)
 - [Common Patterns Demonstrated](#common-patterns-demonstrated)
 - [Contributing Examples](#contributing-examples)
@@ -155,6 +156,76 @@ curl -X POST http://localhost:8080/files/upload \
 
 ---
 
+### 4. Lifecycle Hooks ✅
+
+**Features demonstrated:**
+- Provider-level lifecycle interfaces
+- Database connection initialization
+- Cache warming on startup
+- Graceful shutdown handling
+
+**HTTP App Example:**
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationBootstrap() error {
+    return s.db.Ping() // Verify connection
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    return s.db.Close()
+}
+
+type CacheService struct {
+    cache *sync.Map
+}
+
+func (s *CacheService) OnApplicationBootstrap() error {
+    // Warm cache on startup
+    s.cache.Store("key", "value")
+    return nil
+}
+```
+
+**Non-HTTP App Example (Bot):**
+```go
+type BotService struct {
+    client *discord.Client
+}
+
+func (s *BotService) OnModuleInit() error {
+    s.client = discord.New("token")
+    return nil
+}
+
+func (s *BotService) OnApplicationBootstrap() error {
+    s.client.Open()
+    return nil
+}
+
+func (s *BotService) OnApplicationShutdown() error {
+    s.client.Close()
+    return nil
+}
+
+// No router needed - app waits for SIGINT/SIGTERM
+app := ligo.New()
+app.Register(ligo.NewModule("bot",
+    ligo.Providers(ligo.Factory[*BotService](NewBotService)),
+))
+app.Run() // Blocks until Ctrl+C
+```
+
+---
+
 ## Package Ecosystem
 
 Advanced features like database integration and microservices are provided as separate packages, similar to NestJS's `@nestjs/typeorm` and `@nestjs/microservices` approach.
@@ -222,7 +293,24 @@ cr.Intercept(ligo.LoggingInterceptor(func(start time.Time, ctx Context, err erro
 }))
 ```
 
-### 4. Module Dependencies
+### 4. Lifecycle Hooks
+```go
+type DatabaseService struct {
+    db *sql.DB
+}
+
+func (s *DatabaseService) OnModuleInit() error {
+    var err error
+    s.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    return s.db.Close()
+}
+```
+
+### 5. Module Dependencies
 ```go
 func Module() ligo.Module {
     return ligo.NewModule("user",

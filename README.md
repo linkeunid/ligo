@@ -4,7 +4,7 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen)](https://github.com/linkeunid/ligo)
 [![Coverage](https://img.shields.io/badge/coverage-48.9%25-yellow)](https://github.com/linkeunid/ligo)
 
 > **Note:** Ligo **v1.0** is ready. All requirements completed including comprehensive documentation, integration tests, performance benchmarks, and stability guarantees.
@@ -13,6 +13,7 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 - **Modular Architecture** - Self-contained modules with providers, controllers, and middleware
 - **Dependency Injection** - Automatic dependency resolution with zero boilerplate
+- **Lifecycle Hooks** - OnModuleInit, OnApplicationBootstrap, OnModuleDestroy, OnApplicationShutdown
 - **HTTP Routing** - Adapter-agnostic router interface with Echo v5 adapter
 - **Guards** - Authorization with composable guard functions
 - **Pipes** - Validation and transformation with composable pipes
@@ -97,7 +98,7 @@ func (c *helloController) Hello(ctx ligo.Context) error {
 ## Roadmap
 
 - [x] **Current Version:** 1.0 (All requirements completed)
-- **Test Coverage:** 181 tests passing, 50.4% coverage
+- **Test Coverage:** 208 tests passing, 50.4% coverage
 - **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
 - **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 
