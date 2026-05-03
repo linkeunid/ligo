@@ -94,7 +94,15 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 
 **Works for both HTTP and non-HTTP apps:** Bots, CLI runners, and background workers can use the same lifecycle hooks — just create the app without `WithRouter()`.
 
-See [Controllers](controllers.md#lifecycle-hooks) for detailed examples.
+**Non-HTTP mode details:**
+- Controllers are still instantiated and their lifecycle hooks are executed
+- A `NullRouter` (no-op router) is used internally to satisfy the `Controller` interface
+- Controller `Routes()` methods are called but do nothing
+- `OnApplicationBootstrap` can start background goroutines
+- `Run()` blocks waiting for SIGINT/SIGTERM signals
+- Perfect for: bots, CLI runners, scheduled tasks, message queue consumers
+
+See [Controllers](controllers.md#non-http-controllers-background-workers) for detailed examples.
 
 ## Graceful Shutdown
 

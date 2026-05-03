@@ -24,3 +24,32 @@ type OnModuleDestroy interface {
 type OnApplicationShutdown interface {
 	OnApplicationShutdown() error
 }
+
+// Hooks holds lifecycle hook functions for a single provider or controller.
+type Hooks struct {
+	OnInit      func() error
+	OnBootstrap func() error
+	OnDestroy   func() error
+	OnShutdown  func() error
+}
+
+// CollectHooks checks if a value implements lifecycle interfaces
+// and returns the collected hooks.
+func CollectHooks(v any) Hooks {
+	var hooks Hooks
+
+	if init, ok := v.(OnModuleInit); ok {
+		hooks.OnInit = init.OnModuleInit
+	}
+	if bootstrap, ok := v.(OnApplicationBootstrap); ok {
+		hooks.OnBootstrap = bootstrap.OnApplicationBootstrap
+	}
+	if destroy, ok := v.(OnModuleDestroy); ok {
+		hooks.OnDestroy = destroy.OnModuleDestroy
+	}
+	if shutdown, ok := v.(OnApplicationShutdown); ok {
+		hooks.OnShutdown = shutdown.OnApplicationShutdown
+	}
+
+	return hooks
+}

@@ -212,3 +212,77 @@ app.Register(
 - `OnModuleDestroy` — Called when module destroys
 
 Hooks run in the same order for both HTTP and non-HTTP applications. The only difference is what happens between `OnApplicationBootstrap` and shutdown (HTTP server serves vs. waiting for signals).
+
+### Non-HTTP Controllers (Background Workers)
+
+Controllers can also be used in non-HTTP mode (bots, CLI runners, background workers). The `Routes()` method is **optional** — the framework automatically handles controllers without HTTP routes:
+
+```go
+type WorkerController struct {
+    log    ligo.Logger
+    cancel context.CancelFunc
+}
+
+func NewWorkerController(log ligo.Logger) *WorkerController {
+    return &WorkerController{log: log}
+}
+
+// No Routes() method needed! The framework handles non-HTTP controllers automatically.
+
+func (c *WorkerController) OnModuleInit() error {
+    c.log.Info("Worker initializing")
+    return nil
+}
+
+func (c *WorkerController) OnApplicationBootstrap() error {
+    c.log.Info("Worker starting background goroutine")
+
+    ctx, cancel := context.WithCancel(context.Background())
+    c.cancel = cancel
+
+    go c.run(ctx)
+    return nil
+}
+
+func (c *WorkerController) OnApplicationShutdown() error {
+    c.log.Info("Worker stopping")
+    if c.cancel != nil {
+        c.cancel()
+    }
+    return nil
+}
+
+func (c *WorkerController) run(ctx context.Context) {
+    ticker := time.NewTicker(5 * time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            c.doWork()
+        }
+    }
+}
+
+func (c *WorkerController) doWork() {
+    c.log.Info("Processing scheduled task")
+    // Background work here
+}
+
+// Register without a router for non-HTTP mode
+app := ligo.New()
+app.Register(ligo.NewModule("worker",
+    ligo.Controllers(NewWorkerController),
+))
+app.Run() // Blocks until SIGINT/SIGTERM, worker runs in background
+```
+
+**Key points for non-HTTP controllers:**
+- `Routes()` method is **optional** — only needed if you have HTTP routes
+- `OnApplicationBootstrap` is perfect for starting background goroutines
+- `OnApplicationShutdown` gracefully stops goroutines
+- App blocks on `Run()` waiting for SIGINT/SIGTERM signals
+- All lifecycle hooks execute the same as HTTP mode
+- Perfect for: bots, message queue consumers, scheduled tasks, CLI runners

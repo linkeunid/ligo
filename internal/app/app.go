@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 )
@@ -22,9 +23,9 @@ type Provider interface {
 }
 
 // BuildProviderEntry builds a container entry from a provider and returns its lifecycle hooks.
-func BuildProviderEntry(p Provider) (container.ProviderEntry, ProviderHooks) {
+func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 	if p.Eager() != nil {
-		hooks := collectProviderHooks(p.Eager())
+		hooks := lifecycle.CollectHooks(p.Eager())
 		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported()), hooks
 	}
 
@@ -45,11 +46,11 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, ProviderHooks) {
 		return out[0].Interface(), nil
 	}, nil, argTypes, p.IsTransient(), p.IsExported())
 
-	return entry, ProviderHooks{} // Eager providers have hooks, factories don't know yet
+	return entry, lifecycle.Hooks{} // Eager providers have hooks, factories don't know yet
 }
 
 // RegisterProvider registers a provider in the container and returns its lifecycle hooks.
-func RegisterProvider(c *container.Container, p Provider) ProviderHooks {
+func RegisterProvider(c *container.Container, p Provider) lifecycle.Hooks {
 	entry, hooks := BuildProviderEntry(p)
 	c.Register(p.Type(), entry)
 	return hooks
@@ -63,7 +64,7 @@ func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHo
 	// Pre-allocate capacity for provider hooks to reduce slice growth
 	if cap(hooks.Providers) < len(hooks.Providers)+len(mod.Providers) {
 		newCap := len(hooks.Providers) + len(mod.Providers)
-		newSlice := make([]ProviderHooks, len(hooks.Providers), newCap)
+		newSlice := make([]lifecycle.Hooks, len(hooks.Providers), newCap)
 		copy(newSlice, hooks.Providers)
 		hooks.Providers = newSlice
 	}
@@ -115,36 +116,7 @@ func ExecuteHooks(hooks [][]func() error, log logger.Logger, hookName string) er
 type ModuleHooks struct {
 	OnInit    [][]func() error
 	OnDestroy [][]func() error
-	Providers []ProviderHooks // NEW: provider-level hooks
-}
-
-// ProviderHooks holds lifecycle hooks for a single provider instance.
-type ProviderHooks struct {
-	OnInit      func() error
-	OnBootstrap func() error
-	OnDestroy   func() error
-	OnShutdown  func() error
-}
-
-// collectProviderHooks checks if a value implements lifecycle interfaces
-// and returns the collected hooks.
-func collectProviderHooks(v any) ProviderHooks {
-	var hooks ProviderHooks
-
-	if init, ok := v.(interface{ OnModuleInit() error }); ok {
-		hooks.OnInit = init.OnModuleInit
-	}
-	if bootstrap, ok := v.(interface{ OnApplicationBootstrap() error }); ok {
-		hooks.OnBootstrap = bootstrap.OnApplicationBootstrap
-	}
-	if destroy, ok := v.(interface{ OnModuleDestroy() error }); ok {
-		hooks.OnDestroy = destroy.OnModuleDestroy
-	}
-	if shutdown, ok := v.(interface{ OnApplicationShutdown() error }); ok {
-		hooks.OnShutdown = shutdown.OnApplicationShutdown
-	}
-
-	return hooks
+	Providers []lifecycle.Hooks // provider/controller-level hooks
 }
 
 // ExpandModule materializes a dynamic module and recursively expands its imports,

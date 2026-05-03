@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 )
@@ -28,21 +29,25 @@ func NewBinder(c *container.Container, r Router, log logger.Logger) *Binder {
 }
 
 // BindControllers registers all controllers from modules, applying module middleware per group.
-func (b *Binder) BindControllers(modules []module.Module) error {
+// Returns collected lifecycle hooks from all controllers.
+func (b *Binder) BindControllers(modules []module.Module) ([]lifecycle.Hooks, error) {
+	var allHooks []lifecycle.Hooks
 	for _, mod := range modules {
-		if err := b.bindModuleControllers(mod); err != nil {
-			return err
+		hooks, err := b.bindModuleControllers(mod)
+		if err != nil {
+			return nil, err
 		}
+		allHooks = append(allHooks, hooks...)
 	}
-	return nil
+	return allHooks, nil
 }
 
-func (b *Binder) bindModuleControllers(mod module.Module) error {
+func (b *Binder) bindModuleControllers(mod module.Module) ([]lifecycle.Hooks, error) {
 	var modMw []Middleware
 	for _, mc := range mod.Middlewares {
 		mw, err := b.resolveMiddleware(mc, mod.Name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		modMw = append(modMw, mw)
 	}
@@ -56,19 +61,26 @@ func (b *Binder) bindModuleControllers(mod module.Module) error {
 		router = g
 	}
 
+	var allHooks []lifecycle.Hooks
 	for _, cc := range mod.Controllers {
-		if err := b.bindController(cc, router, mod.Name); err != nil {
-			return err
+		hooks, err := b.bindController(cc, router, mod.Name)
+		if err != nil {
+			return nil, err
+		}
+		if hooks.OnInit != nil || hooks.OnBootstrap != nil || hooks.OnDestroy != nil || hooks.OnShutdown != nil {
+			allHooks = append(allHooks, hooks)
 		}
 	}
 
 	for _, child := range mod.Imports {
-		if err := b.bindModuleControllers(child); err != nil {
-			return err
+		hooks, err := b.bindModuleControllers(child)
+		if err != nil {
+			return nil, err
 		}
+		allHooks = append(allHooks, hooks...)
 	}
 
-	return nil
+	return allHooks, nil
 }
 
 func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor, modName string) (Middleware, error) {
@@ -118,14 +130,14 @@ func (b *Binder) resolveConstructor(fn any, typeName string, modName string, val
 	return validate(out[0])
 }
 
-func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) error {
+func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) (lifecycle.Hooks, error) {
+	var capturedCtrl any
 	_, err := b.resolveConstructor(cc.Fn, "Controller", modName, func(v reflect.Value) (Middleware, error) {
-		ctrl, ok := v.Interface().(Controller)
-		if !ok {
-			return nil, fmt.Errorf("ligo: constructor must return Controller")
-		}
+		// Capture the controller value for hook collection
+		capturedCtrl = v.Interface()
 
-		if ctrl != nil {
+		// Try to call Routes() if the controller implements it
+		if ctrl, ok := capturedCtrl.(Controller); ok {
 			ctrl.Routes(router)
 		}
 
@@ -141,7 +153,10 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 
 		return nil, nil
 	})
-	return err
+
+	// Collect lifecycle hooks from controller
+	hooks := lifecycle.CollectHooks(capturedCtrl)
+	return hooks, err
 }
 
 // extractControllerName extracts the controller name from the constructor.

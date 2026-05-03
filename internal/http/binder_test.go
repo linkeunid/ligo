@@ -54,7 +54,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
-		err := binder.BindControllers([]module.Module{mainMod})
+		_, err := binder.BindControllers([]module.Module{mainMod})
 		if err != nil {
 			t.Fatalf("BindControllers() error = %v", err)
 		}
@@ -87,7 +87,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
-		err := binder.BindControllers([]module.Module{svcMod})
+		_, err := binder.BindControllers([]module.Module{svcMod})
 		if err != nil {
 			t.Fatalf("BindControllers() error = %v", err)
 		}
@@ -115,7 +115,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
-		err := binder.BindControllers([]module.Module{mod})
+		_, err := binder.BindControllers([]module.Module{mod})
 		if err != nil {
 			t.Fatalf("BindControllers() error = %v", err)
 		}
@@ -142,7 +142,7 @@ func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
 	log := logger.New()
 	binder := NewBinder(c, router, log)
 
-	err := binder.BindControllers([]module.Module{mod})
+	_, err := binder.BindControllers([]module.Module{mod})
 	if err == nil {
 		t.Fatal("expected error")
 	}

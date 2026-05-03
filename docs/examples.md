@@ -224,6 +224,78 @@ app.Register(ligo.NewModule("bot",
 app.Run() // Blocks until Ctrl+C
 ```
 
+**Non-HTTP App Example (Background Worker with Controller):**
+```go
+// Worker controller manages background task execution
+type WorkerController struct {
+    log    ligo.Logger
+    cancel context.CancelFunc
+    running bool
+}
+
+func NewWorkerController(log ligo.Logger) *WorkerController {
+    return &WorkerController{log: log}
+}
+
+// No Routes() method needed for non-HTTP mode!
+// The framework handles controllers without HTTP routes automatically.
+
+func (c *WorkerController) OnModuleInit() error {
+    c.log.Info("Worker initializing")
+    return nil
+}
+
+func (c *WorkerController) OnApplicationBootstrap() error {
+    c.log.Info("Worker starting")
+
+    ctx, cancel := context.WithCancel(context.Background())
+    c.cancel = cancel
+    c.running = true
+
+    go c.run(ctx)
+    return nil
+}
+
+func (c *WorkerController) OnApplicationShutdown() error {
+    c.log.Info("Worker stopping")
+    if c.cancel != nil {
+        c.cancel()
+    }
+    c.running = false
+    return nil
+}
+
+func (c *WorkerController) run(ctx context.Context) {
+    ticker := time.NewTicker(5 * time.Second)
+    defer ticker.Stop()
+
+    // Execute immediately on start
+    c.doWork()
+
+    for {
+        select {
+        case <-ctx.Done():
+            c.log.Info("Worker stopped")
+            return
+        case <-ticker.C:
+            c.doWork()
+        }
+    }
+}
+
+func (c *WorkerController) doWork() {
+    c.log.Info("Executing background task...")
+    // Do work here
+}
+
+// Register the worker module
+app := ligo.New()
+app.Register(ligo.NewModule("worker",
+    ligo.Controllers(NewWorkerController),
+))
+app.Run() // Blocks until Ctrl+C, worker runs in background
+```
+
 ---
 
 ## Package Ecosystem

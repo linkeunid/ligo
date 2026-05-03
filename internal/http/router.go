@@ -15,6 +15,24 @@ type Router interface {
 	Serve(addr string) error
 }
 
+// NullRouter is a no-op router used for non-HTTP applications.
+// It allows controllers to be instantiated for lifecycle hooks without actual routing.
+type NullRouter struct{}
+
+// Group returns a new NullRouter (no-op for non-HTTP mode).
+func (n *NullRouter) Group(prefix string) Router { return n }
+
+// Use is a no-op for non-HTTP mode.
+func (n *NullRouter) Use(middleware ...Middleware) {}
+
+// Handle is a no-op for non-HTTP mode.
+func (n *NullRouter) Handle(method, path string, handler HandlerFunc) {}
+
+// Serve returns an error since NullRouter should not serve HTTP.
+func (n *NullRouter) Serve(addr string) error {
+	return context.Canceled
+}
+
 // RouteBuilder provides fluent API for composing routes with guards, pipes, interceptors, and filters.
 type RouteBuilder interface {
 	Guard(guards ...Guard) RouteBuilder

@@ -535,6 +535,64 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 6. Provider `OnModuleDestroy` methods
 7. Module `OnModuleDestroy` functions
 
+### Non-HTTP Controllers for Background Workers
+
+For bots, CLI runners, and scheduled tasks, use controllers without HTTP routes:
+
+```go
+type WorkerController struct {
+    log    ligo.Logger
+    cancel context.CancelFunc
+}
+
+func NewWorkerController(log ligo.Logger) *WorkerController {
+    return &WorkerController{log: log}
+}
+
+// No Routes() method needed! Framework handles non-HTTP controllers automatically.
+
+func (c *WorkerController) OnApplicationBootstrap() error {
+    ctx, cancel := context.WithCancel(context.Background())
+    c.cancel = cancel
+    go c.run(ctx)
+    return nil
+}
+
+func (c *WorkerController) OnApplicationShutdown() error {
+    if c.cancel != nil {
+        c.cancel()
+    }
+    return nil
+}
+
+func (c *WorkerController) run(ctx context.Context) {
+    ticker := time.NewTicker(5 * time.Second)
+    defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            c.processTask()
+        }
+    }
+}
+
+// No router needed - app.Run() blocks on signals
+app := ligo.New()
+app.Register(ligo.NewModule("worker",
+    ligo.Controllers(NewWorkerController),
+))
+app.Run()
+```
+
+**Best practices for background workers:**
+- Use `OnApplicationBootstrap` to start goroutines (not `OnModuleInit`)
+- Store `context.CancelFunc` to gracefully stop goroutines
+- Use `OnApplicationShutdown` to cancel and wait for cleanup
+- `Routes()` method is **optional** — only needed for HTTP routes
+- Use `time.Ticker` for scheduled tasks, not `time.Sleep` in loops
+
 ## Configuration
 
 ### Use Structured Config

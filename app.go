@@ -129,6 +129,30 @@ func (a *App) Run() error {
 
 	a.container = root
 
+	// Bind controllers to collect their lifecycle hooks (must happen before hook execution)
+	var router http.Router
+	if a.opts.router != nil {
+		router = a.opts.router
+		if sc, ok := router.(http.SetContainerRouter); ok {
+			sc.SetContainer(root)
+		}
+		if sl, ok := router.(http.SetLoggerRouter); ok {
+			sl.SetLogger(a.opts.logger)
+		}
+		for _, mw := range a.opts.middlewares {
+			router.Use(mw)
+		}
+	} else {
+		router = &http.NullRouter{}
+	}
+
+	binder := http.NewBinder(a.container, router, a.opts.logger)
+	controllerHooks, err := binder.BindControllers(expandedModules)
+	if err != nil {
+		return err
+	}
+	a.moduleHooks.Providers = append(a.moduleHooks.Providers, controllerHooks...)
+
 	for _, hook := range a.opts.onStart {
 		if err := hook(nil); err != nil {
 			return fmt.Errorf("OnStart hook failed: %w", err)
@@ -157,30 +181,11 @@ func (a *App) Run() error {
 		}
 	}
 
+	fields := []logger.Field{{Key: "context", Value: logger.ContextApp}}
 	if a.opts.router != nil {
-		if sc, ok := a.opts.router.(http.SetContainerRouter); ok {
-			sc.SetContainer(root)
-		}
-
-		if sl, ok := a.opts.router.(http.SetLoggerRouter); ok {
-			sl.SetLogger(a.opts.logger)
-		}
-
-		binder := http.NewBinder(a.container, a.opts.router, a.opts.logger)
-
-		for _, mw := range a.opts.middlewares {
-			a.opts.router.Use(mw)
-		}
-
-		if err := binder.BindControllers(expandedModules); err != nil {
-			return err
-		}
+		fields = append(fields, logger.Field{Key: "addr", Value: a.opts.addr})
 	}
-
-	a.opts.logger.Info("Ligo application started",
-		logger.Field{Key: "context", Value: logger.ContextApp},
-		logger.Field{Key: "addr", Value: a.opts.addr},
-	)
+	a.opts.logger.Info("Ligo application started", fields...)
 
 	if a.opts.router != nil {
 		onStop := make([]func(any) error, len(a.opts.onStop))
