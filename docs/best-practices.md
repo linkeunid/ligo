@@ -515,9 +515,14 @@ func (s *DatabaseService) OnApplicationBootstrap() error {
     return s.db.Ping()
 }
 
-func (s *DatabaseService) OnApplicationShutdown() error {
-    // Close connection gracefully
+func (s *DatabaseService) BeforeApplicationShutdown() error {
+    // Stop accepting new connections, finish in-flight requests
     return s.db.Close()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    // Final cleanup after all connections are drained
+    return nil
 }
 ```
 
@@ -531,7 +536,8 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 2. Provider `OnModuleInit` methods
 3. Provider `OnApplicationBootstrap` methods
 4. App runs (HTTP or signals)
-5. Provider `OnApplicationShutdown` methods
+5. Provider `BeforeApplicationShutdown` methods
+6. Provider `OnApplicationShutdown` methods
 6. Provider `OnModuleDestroy` methods
 7. Module `OnModuleDestroy` functions
 

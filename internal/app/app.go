@@ -80,7 +80,7 @@ func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHo
 		}
 
 		// Collect hooks if any are implemented
-		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil {
+		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnBeforeShutdown != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil {
 			hooks.Providers = append(hooks.Providers, providerHooks)
 		}
 	}

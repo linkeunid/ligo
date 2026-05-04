@@ -895,7 +895,7 @@ type lifecycleTracker struct {
 	calls []string
 }
 
-// trackedProvider implements all 4 lifecycle hooks.
+// trackedProvider implements all 5 lifecycle hooks.
 type trackedProvider struct {
 	tracker *lifecycleTracker
 }
@@ -911,6 +911,13 @@ func (p *trackedProvider) OnApplicationBootstrap() error {
 	p.tracker.mu.Lock()
 	defer p.tracker.mu.Unlock()
 	p.tracker.calls = append(p.tracker.calls, "bootstrap")
+	return nil
+}
+
+func (p *trackedProvider) BeforeApplicationShutdown() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "before-shutdown")
 	return nil
 }
 
@@ -983,7 +990,7 @@ func TestLifecycleHooks(t *testing.T) {
 		copy(calls, tracker.calls)
 		tracker.mu.Unlock()
 
-		expected := []string{"init", "bootstrap", "shutdown", "destroy"}
+		expected := []string{"init", "bootstrap", "before-shutdown", "shutdown", "destroy"}
 		if len(calls) != len(expected) {
 			t.Fatalf("got %d calls, expected %d. Calls: %v", len(calls), len(expected), calls)
 		}

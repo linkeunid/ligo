@@ -211,12 +211,17 @@ func (a *App) Run() error {
 	}
 }
 
-// shutdown executes OnApplicationShutdown and OnModuleDestroy hooks in reverse order.
+// shutdown executes BeforeApplicationShutdown, OnApplicationShutdown, and OnModuleDestroy hooks in reverse order.
 // Logs errors but continues executing remaining hooks.
 func (a *App) shutdown() error {
 	// Execute shutdown and destroy hooks in reverse order
 	for i := len(a.moduleHooks.Providers) - 1; i >= 0; i-- {
 		hooks := a.moduleHooks.Providers[i]
+		if hooks.OnBeforeShutdown != nil {
+			if err := hooks.OnBeforeShutdown(); err != nil {
+				a.opts.logger.Error("BeforeApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
+			}
+		}
 		if hooks.OnShutdown != nil {
 			if err := hooks.OnShutdown(); err != nil {
 				a.opts.logger.Error("OnApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})

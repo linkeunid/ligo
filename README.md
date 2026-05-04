@@ -13,7 +13,7 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 - **Modular Architecture** - Self-contained modules with providers, controllers, and middleware
 - **Dependency Injection** - Automatic dependency resolution with zero boilerplate
-- **Lifecycle Hooks** - OnModuleInit, OnApplicationBootstrap, OnModuleDestroy, OnApplicationShutdown
+- **Lifecycle Hooks** - OnModuleInit, OnApplicationBootstrap, BeforeApplicationShutdown, OnApplicationShutdown, OnModuleDestroy
 - **HTTP Routing** - Adapter-agnostic router interface with Echo v5 adapter
 - **Guards** - Authorization with composable guard functions
 - **Pipes** - Validation and transformation with composable pipes

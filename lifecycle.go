@@ -19,8 +19,14 @@ package ligo
 //	    return err
 //	}
 //
-//	func (s *DatabaseService) OnApplicationShutdown() error {
+//	func (s *DatabaseService) BeforeApplicationShutdown() error {
+//	    // Stop accepting new connections, finish in-flight requests
 //	    return s.db.Close()
+//	}
+//
+//	func (s *DatabaseService) OnApplicationShutdown() error {
+//	    // Final cleanup after all connections are drained
+//	    return nil
 //	}
 //
 // Available hooks (in execution order):
@@ -31,8 +37,12 @@ package ligo
 //   - OnApplicationBootstrap() error — Called after all modules are initialized,
 //     but before the application starts serving (HTTP or signals).
 //
+//   - BeforeApplicationShutdown() error — Called before shutdown begins,
+//     before OnApplicationShutdown. Useful for graceful drain-stop scenarios.
+//     Runs once in reverse order.
+//
 //   - OnApplicationShutdown() error — Called during application shutdown,
-//     before OnModuleDestroy. Runs once in reverse order.
+//     after BeforeApplicationShutdown, before OnModuleDestroy. Runs once in reverse order.
 //
 //   - OnModuleDestroy() error — Called when the module containing this provider
 //     is destroyed. Runs per-module, reverse depth-first during shutdown.

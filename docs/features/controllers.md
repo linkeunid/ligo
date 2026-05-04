@@ -182,6 +182,11 @@ func (s *DatabaseService) OnApplicationShutdown() error {
     return s.db.Close()
 }
 
+func (s *DatabaseService) BeforeApplicationShutdown() error {
+    // Stop accepting new connections, finish in-flight requests
+    return nil
+}
+
 type UserController struct {
     db *DatabaseService
 }
@@ -208,6 +213,7 @@ app.Register(
 **Available hooks:**
 - `OnModuleInit` — Called when module initializes
 - `OnApplicationBootstrap` — Called after all modules initialize, before app serves
+- `BeforeApplicationShutdown` — Called before shutdown begins (drain-stop)
 - `OnApplicationShutdown` — Called during shutdown
 - `OnModuleDestroy` — Called when module destroys
 
@@ -241,6 +247,12 @@ func (c *WorkerController) OnApplicationBootstrap() error {
     c.cancel = cancel
 
     go c.run(ctx)
+    return nil
+}
+
+func (c *WorkerController) BeforeApplicationShutdown() error {
+    c.log.Info("Worker draining - stopping new work")
+    // Signal to stop accepting new work
     return nil
 }
 

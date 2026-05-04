@@ -246,6 +246,7 @@ Providers and controllers can implement lifecycle interfaces for initialization 
 
 - `OnModuleInit() error` — Called when module initializes
 - `OnApplicationBootstrap() error` — Called after all modules initialize, before serving
+- `BeforeApplicationShutdown() error` — Called before shutdown begins (drain-stop)
 - `OnApplicationShutdown() error` — Called during shutdown
 - `OnModuleDestroy() error` — Called when module destroys
 
@@ -262,8 +263,14 @@ func (s *DatabaseService) OnModuleInit() error {
     return err
 }
 
-func (s *DatabaseService) OnApplicationShutdown() error {
+func (s *DatabaseService) BeforeApplicationShutdown() error {
+    // Stop accepting new connections, finish in-flight requests
     return s.db.Close()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    // Final cleanup after all connections are drained
+    return nil
 }
 ```
 **Pipes:** `ValidationPipe`, `ValidatedBody[T]`, `ParseIntPipe`, `ParseBoolPipe`, `UUIDPipe`, `TrimPipe`

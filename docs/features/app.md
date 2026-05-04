@@ -75,11 +75,16 @@ func (s *DatabaseService) OnApplicationBootstrap() error {
 func (s *DatabaseService) OnApplicationShutdown() error {
     return s.db.Close()
 }
+
+func (s *DatabaseService) OnModuleDestroy() error {
+    return nil
+}
 ```
 
 **Available hooks:**
 - `OnModuleInit()` — Called when module initializes
 - `OnApplicationBootstrap()` — Called after all modules initialize, before serving
+- `BeforeApplicationShutdown()` — Called before shutdown begins (drain-stop)
 - `OnApplicationShutdown()` — Called during shutdown
 - `OnModuleDestroy()` — Called when module destroys
 
@@ -88,9 +93,10 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 2. Provider `OnModuleInit` hooks (in registration order)
 3. Provider `OnApplicationBootstrap` hooks
 4. Application runs (HTTP server or signal wait)
-5. Provider `OnApplicationShutdown` hooks (reverse order)
-6. Provider `OnModuleDestroy` hooks (reverse order)
-7. Module-level `OnStop` hooks
+5. Provider `BeforeApplicationShutdown` hooks (reverse order)
+6. Provider `OnApplicationShutdown` hooks (reverse order)
+7. Provider `OnModuleDestroy` hooks (reverse order)
+8. Module-level `OnStop` hooks
 
 **Works for both HTTP and non-HTTP apps:** Bots, CLI runners, and background workers can use the same lifecycle hooks — just create the app without `WithRouter()`.
 

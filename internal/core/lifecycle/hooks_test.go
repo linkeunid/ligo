@@ -7,12 +7,13 @@ import (
 
 // Mock providers implementing different hook combinations
 
-// AllHooksProvider implements all 4 lifecycle hooks
+// AllHooksProvider implements all 5 lifecycle hooks
 type AllHooksProvider struct {
-	initCalled      bool
-	bootstrapCalled bool
-	destroyCalled   bool
-	shutdownCalled  bool
+	initCalled         bool
+	bootstrapCalled    bool
+	beforeShutdownCalled bool
+	destroyCalled      bool
+	shutdownCalled     bool
 }
 
 func (m *AllHooksProvider) OnModuleInit() error {
@@ -22,6 +23,11 @@ func (m *AllHooksProvider) OnModuleInit() error {
 
 func (m *AllHooksProvider) OnApplicationBootstrap() error {
 	m.bootstrapCalled = true
+	return nil
+}
+
+func (m *AllHooksProvider) BeforeApplicationShutdown() error {
+	m.beforeShutdownCalled = true
 	return nil
 }
 
@@ -73,6 +79,13 @@ func (m *ShutdownOnlyProvider) OnApplicationShutdown() error {
 	return nil
 }
 
+// BeforeShutdownOnlyProvider implements only BeforeApplicationShutdown
+type BeforeShutdownOnlyProvider struct{}
+
+func (m *BeforeShutdownOnlyProvider) BeforeApplicationShutdown() error {
+	return nil
+}
+
 // InitAndBootstrapProvider implements OnModuleInit and OnApplicationBootstrap
 type InitAndBootstrapProvider struct{}
 
@@ -97,20 +110,22 @@ func (m *DestroyAndShutdownProvider) OnApplicationShutdown() error {
 
 func TestCollectProviderHooks(t *testing.T) {
 	tests := []struct {
-		name          string
-		provider      any
-		wantInit      bool
-		wantBoot      bool
-		wantDestroy   bool
-		wantShutdown  bool
+		name             string
+		provider         any
+		wantInit         bool
+		wantBoot         bool
+		wantBeforeShutdown bool
+		wantDestroy      bool
+		wantShutdown     bool
 	}{
 		{
-			name:         "all hooks implemented",
-			provider:     &AllHooksProvider{},
-			wantInit:     true,
-			wantBoot:     true,
-			wantDestroy:  true,
-			wantShutdown: true,
+			name:             "all hooks implemented",
+			provider:         &AllHooksProvider{},
+			wantInit:         true,
+			wantBoot:         true,
+			wantBeforeShutdown: true,
+			wantDestroy:      true,
+			wantShutdown:     true,
 		},
 		{
 			name:     "init only",
@@ -131,6 +146,11 @@ func TestCollectProviderHooks(t *testing.T) {
 			name:         "shutdown only",
 			provider:     &ShutdownOnlyProvider{},
 			wantShutdown: true,
+		},
+		{
+			name:             "before shutdown only",
+			provider:         &BeforeShutdownOnlyProvider{},
+			wantBeforeShutdown: true,
 		},
 		{
 			name:     "init and bootstrap",
@@ -159,6 +179,7 @@ func TestCollectProviderHooks(t *testing.T) {
 			// Test interface detection using type assertions
 			_, hasInit := tt.provider.(interface{ OnModuleInit() error })
 			_, hasBoot := tt.provider.(interface{ OnApplicationBootstrap() error })
+			_, hasBeforeShutdown := tt.provider.(interface{ BeforeApplicationShutdown() error })
 			_, hasDestroy := tt.provider.(interface{ OnModuleDestroy() error })
 			_, hasShutdown := tt.provider.(interface{ OnApplicationShutdown() error })
 
@@ -167,6 +188,9 @@ func TestCollectProviderHooks(t *testing.T) {
 			}
 			if hasBoot != tt.wantBoot {
 				t.Errorf("OnApplicationBootstrap detection = %v, want %v", hasBoot, tt.wantBoot)
+			}
+			if hasBeforeShutdown != tt.wantBeforeShutdown {
+				t.Errorf("BeforeApplicationShutdown detection = %v, want %v", hasBeforeShutdown, tt.wantBeforeShutdown)
 			}
 			if hasDestroy != tt.wantDestroy {
 				t.Errorf("OnModuleDestroy detection = %v, want %v", hasDestroy, tt.wantDestroy)
@@ -199,6 +223,14 @@ func TestHookExecution(t *testing.T) {
 			t.Fatalf("OnApplicationBootstrap failed: %v", err)
 		}
 
+		beforeShutdownFn, ok := any(p).(interface{ BeforeApplicationShutdown() error })
+		if !ok {
+			t.Fatal("provider should implement BeforeApplicationShutdown")
+		}
+		if err := beforeShutdownFn.BeforeApplicationShutdown(); err != nil {
+			t.Fatalf("BeforeApplicationShutdown failed: %v", err)
+		}
+
 		destroyFn, ok := any(p).(interface{ OnModuleDestroy() error })
 		if !ok {
 			t.Fatal("provider should implement OnModuleDestroy")
@@ -221,6 +253,9 @@ func TestHookExecution(t *testing.T) {
 		}
 		if !p.bootstrapCalled {
 			t.Error("OnApplicationBootstrap was not called")
+		}
+		if !p.beforeShutdownCalled {
+			t.Error("BeforeApplicationShutdown was not called")
 		}
 		if !p.destroyCalled {
 			t.Error("OnModuleDestroy was not called")
@@ -375,10 +410,11 @@ func TestNilProviderHandling(t *testing.T) {
 		var p any = nil
 		_, hasInit := p.(interface{ OnModuleInit() error })
 		_, hasBoot := p.(interface{ OnApplicationBootstrap() error })
+		_, hasBeforeShutdown := p.(interface{ BeforeApplicationShutdown() error })
 		_, hasDestroy := p.(interface{ OnModuleDestroy() error })
 		_, hasShutdown := p.(interface{ OnApplicationShutdown() error })
 
-		if hasInit || hasBoot || hasDestroy || hasShutdown {
+		if hasInit || hasBoot || hasBeforeShutdown || hasDestroy || hasShutdown {
 			t.Error("nil provider should not implement any hooks")
 		}
 	})

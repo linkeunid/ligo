@@ -180,8 +180,14 @@ func (s *DatabaseService) OnApplicationBootstrap() error {
     return s.db.Ping() // Verify connection
 }
 
-func (s *DatabaseService) OnApplicationShutdown() error {
+func (s *DatabaseService) BeforeApplicationShutdown() error {
+    // Stop accepting new connections, finish in-flight requests
     return s.db.Close()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    // Final cleanup after all connections are drained
+    return nil
 }
 
 type CacheService struct {
@@ -208,6 +214,12 @@ func (s *BotService) OnModuleInit() error {
 
 func (s *BotService) OnApplicationBootstrap() error {
     s.client.Open()
+    return nil
+}
+
+func (s *BotService) BeforeApplicationShutdown() error {
+    // Stop accepting new messages
+    s.client.Disconnect()
     return nil
 }
 
@@ -253,6 +265,12 @@ func (c *WorkerController) OnApplicationBootstrap() error {
     c.running = true
 
     go c.run(ctx)
+    return nil
+}
+
+func (c *WorkerController) BeforeApplicationShutdown() error {
+    c.log.Info("Worker draining - stopping new work")
+    // Signal to stop accepting new work
     return nil
 }
 
@@ -377,8 +395,14 @@ func (s *DatabaseService) OnModuleInit() error {
     return err
 }
 
-func (s *DatabaseService) OnApplicationShutdown() error {
+func (s *DatabaseService) BeforeApplicationShutdown() error {
+    // Stop accepting new connections
     return s.db.Close()
+}
+
+func (s *DatabaseService) OnApplicationShutdown() error {
+    // Final cleanup
+    return nil
 }
 ```
 
