@@ -533,7 +533,9 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 
 ### Compile-Time Safe Hook Registration
 
-For compile-time safety (catching typos in hook method names), use the `HookedFactory` pattern with explicit hook registration:
+For compile-time safety (catching typos in hook method names), use the `HookedFactory` pattern for providers and `HookedController` for controllers:
+
+#### Providers (HookedFactory)
 
 ```go
 type Database struct {
@@ -564,10 +566,53 @@ ligo.Providers(
 )
 ```
 
+#### Controllers (HookedController)
+
+Controllers can also use compile-time safe hook registration:
+
+```go
+type UserController struct {
+    userService *UserService
+    log         ligo.Logger
+}
+
+func (c *UserController) Initialize() error {
+    c.log.Info("User controller initializing")
+    return nil
+}
+
+func (c *UserController) Ready() error {
+    c.log.Info("User controller ready")
+    return nil
+}
+
+func (c *UserController) Draining() error {
+    c.log.Info("User controller draining")
+    return nil
+}
+
+func (c *UserController) Shutdown() error {
+    c.log.Info("User controller shutting down")
+    return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (c *UserController) Register(registry *ligo.HookRegistry) {
+    registry.OnInit(c.Initialize)
+    registry.OnBootstrap(c.Ready)
+    registry.BeforeShutdown(c.Draining)
+    registry.OnShutdown(c.Shutdown)
+}
+
+// Controller registration
+ligo.Controllers(ligo.HookedController(NewUserController))
+```
+
 **Benefits:**
 - **Compile-time safety**: Method typos caught by compiler
 - **Explicit**: Clear what hooks are registered
 - **Flexible**: Only implement the hooks you need
+- **Meaningful names**: Use descriptive method names (`Initialize` vs `OnModuleInit`)
 
 **Execution order:**
 1. Module `OnModuleInit` functions

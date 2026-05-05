@@ -12,6 +12,16 @@ import (
 	"github.com/linkeunid/ligo/internal/core/module"
 )
 
+// unwrapController extracts the underlying constructor and whether it was wrapped.
+// Combines type assertion and unwrapping into a single operation.
+func unwrapController(fn any) (unwrapped any, isHooked bool) {
+	uw, ok := fn.(interface{ Unwrap() any })
+	if ok {
+		return uw.Unwrap(), true
+	}
+	return fn, false
+}
+
 // Binder handles controller registration and dependency injection.
 type Binder struct {
 	container *container.Container
@@ -132,7 +142,11 @@ func (b *Binder) resolveConstructor(fn any, typeName string, modName string, val
 
 func (b *Binder) bindController(cc module.ControllerConstructor, router Router, modName string) (lifecycle.Hooks, error) {
 	var capturedCtrl any
-	_, err := b.resolveConstructor(cc.Fn, "Controller", modName, func(v reflect.Value) (Middleware, error) {
+
+	// Unwrap controller constructor if wrapped with HookedController
+	constructorFn, _ := unwrapController(cc.Fn)
+
+	_, err := b.resolveConstructor(constructorFn, "Controller", modName, func(v reflect.Value) (Middleware, error) {
 		// Capture the controller value for hook collection
 		capturedCtrl = v.Interface()
 
@@ -142,7 +156,7 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 		}
 
 		if b.logger != nil {
-			ctrlName := b.extractControllerName(cc.Fn)
+			ctrlName := b.extractControllerName(constructorFn)
 			if ctrlName == "" {
 				ctrlName = "controller"
 			}
@@ -154,9 +168,15 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 		return nil, nil
 	})
 
-	// Collect lifecycle hooks from controller
-	hooks := lifecycle.CollectHooks(capturedCtrl)
-	return hooks, err
+	// Try explicit hook registration first, then fall back to interface-based detection.
+	// This works for both HookedController (with Register method) and regular controllers.
+	if registerable, ok := capturedCtrl.(interface{ Register(*lifecycle.HookRegistry) }); ok {
+		registry := lifecycle.NewHookRegistry(nil)
+		registerable.Register(registry)
+		return registry.ToHooks(), err
+	}
+	// Fall back to interface-based hook detection (duck-typing)
+	return lifecycle.CollectHooks(capturedCtrl), err
 }
 
 // extractControllerName extracts the controller name from the constructor.

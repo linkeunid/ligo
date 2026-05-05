@@ -88,9 +88,11 @@ func (s *DatabaseService) OnModuleDestroy() error {
 - `OnApplicationShutdown()` — Called during shutdown
 - `OnModuleDestroy()` — Called when module destroys
 
-### Compile-Time Safe Hook Registration (HookedFactory)
+### Compile-Time Safe Hook Registration (HookedFactory/HookedController)
 
-For compile-time safety (catching typos in hook method names), use the `HookedFactory` pattern with explicit hook registration:
+For compile-time safety (catching typos in hook method names), use the `HookedFactory` pattern for providers and `HookedController` for controllers with explicit hook registration:
+
+#### Providers (HookedFactory)
 
 ```go
 type Database struct {
@@ -122,11 +124,54 @@ ligo.Providers(
 )
 ```
 
-**Benefits of HookedFactory:**
+#### Controllers (HookedController)
+
+Controllers can also use compile-time safe hook registration:
+
+```go
+type UserController struct {
+    userService *UserService
+    log         ligo.Logger
+}
+
+func (c *UserController) Initialize() error {
+    c.log.Info("User controller initializing")
+    return nil
+}
+
+func (c *UserController) Ready() error {
+    c.log.Info("User controller ready to handle requests")
+    return nil
+}
+
+func (c *UserController) Draining() error {
+    c.log.Info("User controller draining - completing in-flight requests")
+    return nil
+}
+
+func (c *UserController) Shutdown() error {
+    c.log.Info("User controller shutting down")
+    return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (c *UserController) Register(registry *ligo.HookRegistry) {
+    registry.OnInit(c.Initialize)      // Compile-time checked
+    registry.OnBootstrap(c.Ready)      // Compile-time checked
+    registry.BeforeShutdown(c.Draining) // Compile-time checked
+    registry.OnShutdown(c.Shutdown)    // Compile-time checked
+}
+
+// Controller registration with HookedController
+ligo.Controllers(ligo.HookedController(NewUserController))
+```
+
+**Benefits of HookedFactory/HookedController:**
 - **Compile-time safety**: Method typos are caught by the compiler
 - **Explicit registration**: Clear what hooks are registered via the `Register` method
+- **Meaningful names**: Use descriptive method names (`Initialize` vs `OnModuleInit`)
 - **Same flexibility**: Only implement the hooks you need
-- **Works for both Factory and Value providers**
+- **Works for providers and controllers**
 
 **Execution order:**
 1. Module-level `OnStart` hooks

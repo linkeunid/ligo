@@ -69,6 +69,59 @@ func Controllers(constructors ...any) module.ModuleOption {
 	return module.Controllers(constructors...)
 }
 
+// HookedController wraps a controller constructor to enable explicit hook registration
+// via a Register method on the controller instance. This provides compile-time safety
+// for hook method expressions, similar to HookedFactory for providers.
+//
+// The controller instance can implement:
+//
+//	type Registerable interface {
+//	    Register(*lifecycle.HookRegistry)
+//	}
+//
+// Example:
+//
+//	type UserController struct {
+//	    userService *UserService
+//	    log         ligo.Logger
+//	}
+//
+//	func NewUserController(svc *UserService, log ligo.Logger) *UserController {
+//	    return &UserController{userService: svc, log: log}
+//	}
+//
+//	func (c *UserController) Initialize() error {
+//	    c.log.Info("User controller initializing")
+//	    return nil
+//	}
+//
+//	func (c *UserController) Ready() error {
+//	    c.log.Info("User controller ready")
+//	    return nil
+//	}
+//
+//	// Register method enables compile-time safe hook registration
+//	func (c *UserController) Register(r *lifecycle.HookRegistry) {
+//	    r.OnInit(c.Initialize)    // Method expression - compile-time checked
+//	    r.OnBootstrap(c.Ready)    // If Ready doesn't exist → compile error
+//	}
+//
+//	// Controller registration
+//	ligo.HookedController(NewUserController)
+func HookedController(fn any) any {
+	return &hookedController{fn: fn}
+}
+
+// hookedController wraps a controller constructor for explicit hook registration.
+type hookedController struct {
+	fn any
+}
+
+// Unwrap returns the underlying controller constructor.
+func (hc *hookedController) Unwrap() any {
+	return hc.fn
+}
+
 // Middlewares adds middleware constructors that receive dependencies via DI.
 // Each constructor is called with resolved dependencies and must return a Middleware.
 //

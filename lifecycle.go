@@ -14,7 +14,7 @@ import "github.com/linkeunid/ligo/internal/core/lifecycle"
 // 2. **Explicit registration** - Use Hooks() to explicitly register hook functions.
 //
 // 3. **Compile-time safe registration** - Implement the Registerable interface
-//    and use HookedFactory/Value(WithHooks()) for compile-time checked hook methods.
+//    and use HookedFactory/HookedController for compile-time checked hook methods.
 //
 // ## Interface-based Example:
 //
@@ -53,7 +53,7 @@ import "github.com/linkeunid/ligo/internal/core/lifecycle"
 //	   	),
 //	)
 //
-// ## Compile-Time Safe Registration (HookedFactory):
+// ## Compile-Time Safe Registration (HookedFactory/HookedController):
 //
 //	type Database struct {
 //	    db *sql.DB
@@ -74,10 +74,36 @@ import "github.com/linkeunid/ligo/internal/core/lifecycle"
 //	    r.OnShutdown(d.Close)   // Typo "Conenct" → compile error
 //	}
 //
-//	// Provider registration with HookedFactory
+	// Provider registration with HookedFactory
 //	ligo.HookedFactory[*Database](NewDatabase)
 //	// OR with Value:
 //	ligo.Value(database, ligo.WithHooks())
+//
+// ## Compile-Time Safe Registration for Controllers (HookedController):
+//
+//	type UserController struct {
+//	    userService *UserService
+//	    log         ligo.Logger
+//	}
+//
+//	func (c *UserController) Initialize() error {
+//	    c.log.Info("User controller initializing")
+//	    return nil
+//	}
+//
+//	func (c *UserController) Ready() error {
+//	    c.log.Info("User controller ready")
+//	    return nil
+//	}
+//
+//	// Register implements the Registerable interface
+//	func (c *UserController) Register(r *lifecycle.HookRegistry) {
+//	    r.OnInit(c.Initialize)   // Compile-time checked
+//	    r.OnBootstrap(c.Ready)   // Compile-time checked
+//	}
+//
+//	// Controller registration with HookedController
+//	ligo.Controllers(ligo.HookedController(NewUserController))
 //
 // ## Module-level Hooks Example:
 //

@@ -252,35 +252,43 @@ func NewWorkerController(log ligo.Logger) *WorkerController {
 // No Routes() method needed for non-HTTP mode!
 // The framework handles controllers without HTTP routes automatically.
 
-func (c *WorkerController) OnModuleInit() error {
+// Hook methods with meaningful names
+func (c *WorkerController) Initialize() error {
     c.log.Info("Worker initializing")
     return nil
 }
 
-func (c *WorkerController) OnApplicationBootstrap() error {
-    c.log.Info("Worker starting")
+func (c *WorkerController) StartBackground() error {
+    c.log.Info("Worker starting background goroutine")
 
     ctx, cancel := context.WithCancel(context.Background())
     c.cancel = cancel
-    c.running = true
 
     go c.run(ctx)
+    c.running = true
     return nil
 }
 
-func (c *WorkerController) BeforeApplicationShutdown() error {
+func (c *WorkerController) DrainWork() error {
     c.log.Info("Worker draining - stopping new work")
-    // Signal to stop accepting new work
+    c.running = false
     return nil
 }
 
-func (c *WorkerController) OnApplicationShutdown() error {
+func (c *WorkerController) Stop() error {
     c.log.Info("Worker stopping")
     if c.cancel != nil {
         c.cancel()
     }
-    c.running = false
     return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (c *WorkerController) Register(registry *ligo.HookRegistry) {
+    registry.OnInit(c.Initialize)
+    registry.OnBootstrap(c.StartBackground)
+    registry.BeforeShutdown(c.DrainWork)
+    registry.OnShutdown(c.Stop)
 }
 
 func (c *WorkerController) run(ctx context.Context) {
@@ -306,17 +314,17 @@ func (c *WorkerController) doWork() {
     // Do work here
 }
 
-// Register the worker module
+// Register the worker module with HookedController
 app := ligo.New()
 app.Register(ligo.NewModule("worker",
-    ligo.Controllers(NewWorkerController),
+    ligo.Controllers(ligo.HookedController(NewWorkerController)),
 ))
 app.Run() // Blocks until Ctrl+C, worker runs in background
 ```
 
-**Compile-Time Safe Hook Registration (HookedFactory):**
+**Compile-Time Safe Hook Registration (HookedFactory/HookedController):**
 
-For compile-time safety (catching typos in hook method names at compile time), use the `HookedFactory` pattern with the `Register` method:
+For compile-time safety (catching typos in hook method names at compile time), use the `HookedFactory` pattern for providers and `HookedController` for controllers:
 
 ```go
 type Database struct {
@@ -340,12 +348,15 @@ func (d *Database) Register(r *ligo.HookRegistry) {
     r.OnShutdown(d.Close)   // Typo "Conenct" → compile error
 }
 
-// Provider registration
+// Provider registration with HookedFactory
 ligo.Providers(
     ligo.HookedFactory[*Database](NewDatabase),
     // OR with Value:
     ligo.Value(database, ligo.WithHooks()),
 )
+
+// Controller registration with HookedController
+ligo.Controllers(ligo.HookedController(NewWorkerController))
 ```
 
 **Benefits of HookedFactory:**

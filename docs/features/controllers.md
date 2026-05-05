@@ -165,7 +165,9 @@ func (c *UserController) Routes(r ligo.Router) {
 
 ## Lifecycle Hooks
 
-Controllers and providers can implement lifecycle interfaces to run code at specific application stages:
+Controllers and providers can implement lifecycle interfaces to run code at specific application stages.
+
+### Interface-Based Hooks (Duck-Typing)
 
 ```go
 type DatabaseService struct {
@@ -210,6 +212,68 @@ app.Register(
 )
 ```
 
+### Compile-Time Safe Hooks (HookedController)
+
+For compile-time safety, use the `HookedController` pattern:
+
+```go
+type UserController struct {
+    userService *UserService
+    log         ligo.Logger
+}
+
+func NewUserController(svc *UserService, log ligo.Logger) *UserController {
+    return &UserController{userService: svc, log: log}
+}
+
+// Hook methods with meaningful names
+func (c *UserController) Initialize() error {
+    c.log.Info("User controller initializing")
+    return nil
+}
+
+func (c *UserController) Ready() error {
+    c.log.Info("User controller ready to handle requests")
+    return nil
+}
+
+func (c *UserController) Draining() error {
+    c.log.Info("User controller draining - completing in-flight requests")
+    return nil
+}
+
+func (c *UserController) Shutdown() error {
+    c.log.Info("User controller shutting down")
+    return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (c *UserController) Register(registry *ligo.HookRegistry) {
+    registry.OnInit(c.Initialize)      // Compile-time checked
+    registry.OnBootstrap(c.Ready)      // Compile-time checked
+    registry.BeforeShutdown(c.Draining) // Compile-time checked
+    registry.OnShutdown(c.Shutdown)    // Compile-time checked
+}
+
+func (c *UserController) Routes(r ligo.Router) {
+    r.Handle("GET", "/users", c.List)
+    r.Handle("GET", "/users/:id", c.Get)
+}
+
+// Register with HookedController
+app.Register(ligo.NewModule("users",
+    ligo.Providers(
+        ligo.Factory[*UserService](NewUserService),
+    ),
+    ligo.Controllers(ligo.HookedController(NewUserController)),
+))
+```
+
+**Benefits of HookedController:**
+- **Compile-time safety**: Method typos are caught by the compiler
+- **Explicit registration**: Clear what hooks are registered via the `Register` method
+- **Meaningful names**: Use descriptive method names (`Initialize` vs `OnModuleInit`)
+
 **Available hooks:**
 - `OnModuleInit` — Called when module initializes
 - `OnApplicationBootstrap` — Called after all modules initialize, before app serves
@@ -235,12 +299,13 @@ func NewWorkerController(log ligo.Logger) *WorkerController {
 
 // No Routes() method needed! The framework handles non-HTTP controllers automatically.
 
-func (c *WorkerController) OnModuleInit() error {
+// Hook methods with meaningful names
+func (c *WorkerController) Initialize() error {
     c.log.Info("Worker initializing")
     return nil
 }
 
-func (c *WorkerController) OnApplicationBootstrap() error {
+func (c *WorkerController) StartBackground() error {
     c.log.Info("Worker starting background goroutine")
 
     ctx, cancel := context.WithCancel(context.Background())
@@ -250,18 +315,26 @@ func (c *WorkerController) OnApplicationBootstrap() error {
     return nil
 }
 
-func (c *WorkerController) BeforeApplicationShutdown() error {
+func (c *WorkerController) DrainWork() error {
     c.log.Info("Worker draining - stopping new work")
     // Signal to stop accepting new work
     return nil
 }
 
-func (c *WorkerController) OnApplicationShutdown() error {
+func (c *WorkerController) Stop() error {
     c.log.Info("Worker stopping")
     if c.cancel != nil {
         c.cancel()
     }
     return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (c *WorkerController) Register(registry *ligo.HookRegistry) {
+    registry.OnInit(c.Initialize)
+    registry.OnBootstrap(c.StartBackground)
+    registry.BeforeShutdown(c.DrainWork)
+    registry.OnShutdown(c.Stop)
 }
 
 func (c *WorkerController) run(ctx context.Context) {
@@ -283,18 +356,19 @@ func (c *WorkerController) doWork() {
     // Background work here
 }
 
-// Register without a router for non-HTTP mode
+// Register with HookedController for non-HTTP mode
 app := ligo.New()
 app.Register(ligo.NewModule("worker",
-    ligo.Controllers(NewWorkerController),
+    ligo.Controllers(ligo.HookedController(NewWorkerController)),
 ))
 app.Run() // Blocks until SIGINT/SIGTERM, worker runs in background
 ```
 
 **Key points for non-HTTP controllers:**
 - `Routes()` method is **optional** — only needed if you have HTTP routes
-- `OnApplicationBootstrap` is perfect for starting background goroutines
-- `OnApplicationShutdown` gracefully stops goroutines
+- Use `HookedController` for compile-time safe hook registration
+- `OnApplicationBootstrap` (or custom `StartBackground`) is perfect for starting background goroutines
+- `OnApplicationShutdown` (or custom `Stop`) gracefully stops goroutines
 - App blocks on `Run()` waiting for SIGINT/SIGTERM signals
 - All lifecycle hooks execute the same as HTTP mode
 - Perfect for: bots, message queue consumers, scheduled tasks, CLI runners
