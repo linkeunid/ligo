@@ -40,7 +40,7 @@ func (testGreeterB) Greet() string { return "hello-b" }
 func TestContainerProvideAndResolve(t *testing.T) {
 	c := New()
 	typ := reflect.TypeOf((*testService)(nil))
-	c.Register(typ, NewEntry(nil, &testService{name: "test"}, nil, false, false))
+	c.Register(typ, NewEntry(nil, &testService{name: "test"}, nil, false, false, nil))
 
 	entry := c.providers[typ]
 	if entry.eager == nil {
@@ -50,7 +50,7 @@ func TestContainerProvideAndResolve(t *testing.T) {
 
 func TestResolveValue(t *testing.T) {
 	c := New()
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "resolved"}, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "resolved"}, nil, false, false, nil))
 
 	svc := Resolve[*testService](c)
 	if svc == nil {
@@ -79,7 +79,7 @@ func TestResolveFactory(t *testing.T) {
 	factory := func(args []reflect.Value) (any, error) {
 		return &testService{name: "factory"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
 
 	svc := Resolve[*testService](c)
 	if svc == nil {
@@ -98,7 +98,7 @@ func TestResolveTransient(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "transient"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false, nil))
 
 	svc1 := Resolve[*testService](c)
 	svc2 := Resolve[*testService](c)
@@ -119,7 +119,7 @@ func TestResolveSingleton(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "singleton"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
 
 	svc1 := Resolve[*testService](c)
 	svc2 := Resolve[*testService](c)
@@ -136,7 +136,7 @@ func TestAutoInject(t *testing.T) {
 	c := New()
 
 	// Register base service
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "base"}, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "base"}, nil, false, false, nil))
 
 	// Register wrapper with dependency on testService
 	factory := func(args []reflect.Value) (any, error) {
@@ -144,7 +144,7 @@ func TestAutoInject(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testWrapper)(nil)), NewEntry(factory, nil, []reflect.Type{
 		reflect.TypeOf((*testService)(nil)),
-	}, false, false))
+	}, false, false, nil))
 
 	wrapper := Resolve[*testWrapper](c)
 	if wrapper.svc == nil {
@@ -164,7 +164,7 @@ func TestCircularDependency(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testServiceA)(nil)), NewEntry(factoryA, nil, []reflect.Type{
 		reflect.TypeOf((*testServiceB)(nil)),
-	}, false, false))
+	}, false, false, nil))
 
 	// Register B depends on A
 	factoryB := func(args []reflect.Value) (any, error) {
@@ -172,7 +172,7 @@ func TestCircularDependency(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testServiceB)(nil)), NewEntry(factoryB, nil, []reflect.Type{
 		reflect.TypeOf((*testServiceA)(nil)),
-	}, false, false))
+	}, false, false, nil))
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -186,10 +186,10 @@ func TestCircularDependency(t *testing.T) {
 func TestDuplicateProvider(t *testing.T) {
 	c := New()
 
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "first"}, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "first"}, nil, false, false, nil))
 
 	// Duplicate provider should be ignored (no panic)
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "second"}, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "second"}, nil, false, false, nil))
 
 	// Verify the first provider is still used
 	svc := Resolve[*testService](c)
@@ -206,7 +206,7 @@ func TestConcurrentResolve(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "concurrent"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
 
 	// Resolve concurrently from 10 goroutines
 	var wg sync.WaitGroup
@@ -235,7 +235,7 @@ func TestConcurrentResolve(t *testing.T) {
 func TestResolveInterfaceTypeDirectKey(t *testing.T) {
 	c := New()
 	doerType := reflect.TypeOf((*testDoer)(nil)).Elem()
-	c.Register(doerType, NewEntry(nil, testDoerImpl{}, nil, false, false))
+	c.Register(doerType, NewEntry(nil, testDoerImpl{}, nil, false, false, nil))
 
 	result := Resolve[testDoer](c)
 	if result.Do() != "done" {
@@ -251,7 +251,7 @@ func TestConcurrentTransient(t *testing.T) {
 		n := counter.Add(1)
 		return &testService{name: fmt.Sprintf("instance-%d", n)}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false))
+	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false, nil))
 
 	var wg sync.WaitGroup
 	results := make([]*testService, 10)
@@ -284,7 +284,7 @@ func TestConcurrentTransient(t *testing.T) {
 func TestResolveByInterface_FallbackScan(t *testing.T) {
 	c := New()
 	implType := reflect.TypeOf(testGreeterA{})
-	c.Register(implType, NewEntry(nil, testGreeterA{}, nil, false, false))
+	c.Register(implType, NewEntry(nil, testGreeterA{}, nil, false, false, nil))
 
 	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
 	result, err := c.resolve(greeterType, nil)
@@ -298,8 +298,8 @@ func TestResolveByInterface_FallbackScan(t *testing.T) {
 
 func TestResolveByInterface_AmbiguousReturnsError(t *testing.T) {
 	c := New()
-	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(nil, testGreeterA{}, nil, false, false))
-	c.Register(reflect.TypeOf(testGreeterB{}), NewEntry(nil, testGreeterB{}, nil, false, false))
+	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(nil, testGreeterA{}, nil, false, false, nil))
+	c.Register(reflect.TypeOf(testGreeterB{}), NewEntry(nil, testGreeterB{}, nil, false, false, nil))
 
 	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
 	_, err := c.resolve(greeterType, nil)
@@ -323,7 +323,7 @@ func TestResolveByInterface_CachedAfterFirst(t *testing.T) {
 		counter.Add(1)
 		return testGreeterA{}, nil
 	}
-	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(factory, nil, nil, false, false))
+	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(factory, nil, nil, false, false, nil))
 
 	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
 
@@ -353,7 +353,7 @@ func TestBuildPreservesCause(t *testing.T) {
 		func(args []reflect.Value) (any, error) { return testSvcA{}, nil },
 		nil,
 		[]reflect.Type{bType},
-		false, false,
+		false, false, nil,
 	))
 
 	_, err := c.resolve(aType, nil)

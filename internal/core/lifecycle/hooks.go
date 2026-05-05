@@ -41,6 +41,25 @@ type Hooks struct {
 	OnBeforeShutdown func() error
 	OnDestroy      func() error
 	OnShutdown     func() error
+	registry       *HookRegistry // Optional: reference to registry for dynamic hook refresh
+}
+
+// Refresh updates hooks from the registry if it exists and returns the updated hooks.
+// This is called after RegisterFrom to get hooks registered via the Register method.
+func (h Hooks) Refresh() Hooks {
+	if h.registry != nil {
+		h.OnInit = h.registry.onInit
+		h.OnBootstrap = h.registry.onBootstrap
+		h.OnBeforeShutdown = h.registry.beforeShutdown
+		h.OnDestroy = h.registry.onDestroy
+		h.OnShutdown = h.registry.onShutdown
+	}
+	return h
+}
+
+// HasRegistry returns true if the hooks have an associated registry (for HookedFactory pattern).
+func (h Hooks) HasRegistry() bool {
+	return h.registry != nil
 }
 
 // CollectHooks checks if a value implements lifecycle interfaces

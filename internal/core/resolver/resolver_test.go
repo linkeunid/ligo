@@ -58,7 +58,7 @@ func TestResolve(t *testing.T) {
 			nil,
 			nil,
 			false,
-			false,
+			false, nil,
 		))
 
 		r := New(c)
@@ -106,7 +106,7 @@ func TestResolveCircularDependency(t *testing.T) {
 			nil,
 			[]reflect.Type{reflect.TypeOf(&CircularB{})},
 			false,
-			false,
+			false, nil,
 		))
 
 		// Register B that depends on A
@@ -117,7 +117,7 @@ func TestResolveCircularDependency(t *testing.T) {
 			nil,
 			[]reflect.Type{reflect.TypeOf(&CircularA{})},
 			false,
-			false,
+			false, nil,
 		))
 
 		r := New(c)
@@ -141,7 +141,7 @@ func TestResolveCircularDependency(t *testing.T) {
 			nil,
 			nil,
 			false,
-			false,
+			false, nil,
 		))
 
 		c.Register(reflect.TypeOf(&AnotherImpl{}), container.NewEntry(
@@ -151,7 +151,7 @@ func TestResolveCircularDependency(t *testing.T) {
 			nil,
 			nil,
 			false,
-			false,
+			false, nil,
 		))
 
 		r := New(c)
@@ -181,7 +181,7 @@ func TestResolveErrorHandling(t *testing.T) {
 			func(args []reflect.Value) (any, error) {
 				return nil, errors.New("factory error")
 			},
-			nil, nil, false, false,
+			nil, nil, false, false, nil,
 		))
 
 		r := New(c)
@@ -200,7 +200,7 @@ func TestResolveErrorHandling(t *testing.T) {
 			func(args []reflect.Value) (any, error) {
 				return nil, nil
 			},
-			nil, nil, false, false,
+			nil, nil, false, false, nil,
 		))
 
 		r := New(c)

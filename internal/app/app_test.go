@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 )
@@ -38,6 +39,10 @@ func (m *mockProvider) IsExported() bool {
 
 func (m *mockProvider) Fn() func() string {
 	return func() string { return "test" }
+}
+
+func (m *mockProvider) Hooks() *lifecycle.HookRegistry {
+	return nil
 }
 
 type TestService struct{}
@@ -520,6 +525,56 @@ func TestExpandModules(t *testing.T) {
 		result := ExpandModules(nil)
 		if result != nil {
 			t.Errorf("ExpandModules(nil) = %v, want nil", result)
+		}
+	})
+}
+
+func TestExplicitHooks(t *testing.T) {
+	t.Run("module with explicit hooks registry", func(t *testing.T) {
+		c := container.New()
+		registry := lifecycle.NewModuleHookRegistry()
+		registry.OnInit(func() error {
+			return nil
+		})
+		registry.OnDestroy(func() error {
+			return nil
+		})
+
+		m := module.New("test",
+			module.Hooks(registry),
+		)
+
+		hooks := &ModuleHooks{}
+		BuildModule(c, m, hooks)
+
+		if len(hooks.OnInit) != 1 {
+			t.Errorf("BuildModule() OnInit length = %d, want 1", len(hooks.OnInit))
+		}
+		if len(hooks.OnDestroy) != 1 {
+			t.Errorf("BuildModule() OnDestroy length = %d, want 1", len(hooks.OnDestroy))
+		}
+	})
+
+	t.Run("module with both explicit and functional hooks", func(t *testing.T) {
+		c := container.New()
+		registry := lifecycle.NewModuleHookRegistry()
+		registry.OnInit(func() error {
+			return nil
+		})
+
+		m := module.New("test",
+			module.OnModuleInit(func() error {
+				return nil
+			}),
+			module.Hooks(registry),
+		)
+
+		hooks := &ModuleHooks{}
+		BuildModule(c, m, hooks)
+
+		// Should have 2 init hooks (one from OnModuleInit, one from registry)
+		if len(hooks.OnInit) != 2 {
+			t.Errorf("BuildModule() OnInit length = %d, want 2", len(hooks.OnInit))
 		}
 	})
 }

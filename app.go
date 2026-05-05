@@ -114,7 +114,7 @@ func (a *App) Run() error {
 	root := container.New(a.opts.logger)
 
 	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
-	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true))
+	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true, nil))
 
 	for _, p := range a.providers {
 		app.RegisterProvider(root, p)
@@ -164,18 +164,22 @@ func (a *App) Run() error {
 	}
 
 	// Execute provider OnModuleInit hooks
-	for _, hooks := range a.moduleHooks.Providers {
-		if hooks.OnInit != nil {
-			if err := hooks.OnInit(); err != nil {
+	for i := range a.moduleHooks.Providers {
+		// Only refresh if registry exists (HookedFactory pattern where RegisterFrom may have been called during resolution)
+		if a.moduleHooks.Providers[i].HasRegistry() {
+			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
+		}
+		if a.moduleHooks.Providers[i].OnInit != nil {
+			if err := a.moduleHooks.Providers[i].OnInit(); err != nil {
 				return fmt.Errorf("OnModuleInit hook failed: %w", err)
 			}
 		}
 	}
 
 	// Execute provider OnApplicationBootstrap hooks
-	for _, hooks := range a.moduleHooks.Providers {
-		if hooks.OnBootstrap != nil {
-			if err := hooks.OnBootstrap(); err != nil {
+	for i := range a.moduleHooks.Providers {
+		if a.moduleHooks.Providers[i].OnBootstrap != nil {
+			if err := a.moduleHooks.Providers[i].OnBootstrap(); err != nil {
 				return fmt.Errorf("OnApplicationBootstrap hook failed: %w", err)
 			}
 		}
@@ -214,24 +218,32 @@ func (a *App) Run() error {
 // shutdown executes BeforeApplicationShutdown, OnApplicationShutdown, and OnModuleDestroy hooks in reverse order.
 // Logs errors but continues executing remaining hooks.
 func (a *App) shutdown() error {
-	// Execute shutdown and destroy hooks in reverse order
+	// Execute provider shutdown and destroy hooks in reverse order
 	for i := len(a.moduleHooks.Providers) - 1; i >= 0; i-- {
-		hooks := a.moduleHooks.Providers[i]
-		if hooks.OnBeforeShutdown != nil {
-			if err := hooks.OnBeforeShutdown(); err != nil {
+		// Only refresh if registry exists (HookedFactory pattern where RegisterFrom may have been called during resolution)
+		if a.moduleHooks.Providers[i].HasRegistry() {
+			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
+		}
+		if a.moduleHooks.Providers[i].OnBeforeShutdown != nil {
+			if err := a.moduleHooks.Providers[i].OnBeforeShutdown(); err != nil {
 				a.opts.logger.Error("BeforeApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
 			}
 		}
-		if hooks.OnShutdown != nil {
-			if err := hooks.OnShutdown(); err != nil {
+		if a.moduleHooks.Providers[i].OnShutdown != nil {
+			if err := a.moduleHooks.Providers[i].OnShutdown(); err != nil {
 				a.opts.logger.Error("OnApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
 			}
 		}
-		if hooks.OnDestroy != nil {
-			if err := hooks.OnDestroy(); err != nil {
+		if a.moduleHooks.Providers[i].OnDestroy != nil {
+			if err := a.moduleHooks.Providers[i].OnDestroy(); err != nil {
 				a.opts.logger.Error("OnModuleDestroy hook failed", logger.Field{Key: "error", Value: err})
 			}
 		}
+	}
+
+	// Execute module-level OnDestroy hooks in reverse order
+	if err := app.ExecuteHooks(a.moduleHooks.OnDestroy, a.opts.logger, "OnModuleDestroy"); err != nil {
+		a.opts.logger.Error("Module OnDestroy hooks failed", logger.Field{Key: "error", Value: err})
 	}
 
 	return nil

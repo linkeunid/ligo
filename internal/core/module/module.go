@@ -1,5 +1,7 @@
 package module
 
+import "github.com/linkeunid/ligo/internal/core/lifecycle"
+
 // DynamicModule wraps a module factory with options.
 type DynamicModule struct {
 	Factory func(...any) Module
@@ -15,6 +17,7 @@ type Module struct {
 	Middlewares []MiddlewareConstructor
 	OnInit      []func() error
 	OnDestroy   []func() error
+	Hooks       *lifecycle.ModuleHookRegistry
 	Dynamic     *DynamicModule
 }
 
@@ -83,6 +86,13 @@ func OnModuleInit(fn func() error) ModuleOption {
 func OnModuleDestroy(fn func() error) ModuleOption {
 	return func(m *Module) {
 		m.OnDestroy = append(m.OnDestroy, fn)
+	}
+}
+
+// Hooks adds explicit lifecycle hooks to the module.
+func Hooks(registry *lifecycle.ModuleHookRegistry) ModuleOption {
+	return func(m *Module) {
+		m.Hooks = registry
 	}
 }
 

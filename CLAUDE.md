@@ -19,7 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Run tests (208 tests passing, 48.9% coverage)
+# Run tests (217 tests passing, 48.9% coverage)
+# Count tests with: go test -v ./... 2>&1 | grep -c 'PASS:'
 go test ./...
 go test -v ./...
 

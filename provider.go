@@ -3,7 +3,11 @@ package ligo
 // Package ligo provides dependency injection providers for registering
 // values, factories, and transient services in the DI container.
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
+)
 
 // Provider represents a dependency provider that can be registered
 // in the DI container. Providers can be eager values or factory functions.
@@ -13,6 +17,7 @@ type Provider struct {
 	eager     any
 	transient bool
 	exported  bool
+	hooks     *lifecycle.HookRegistry
 }
 
 // Value registers a pre-built instance as a singleton.
@@ -22,27 +27,43 @@ type Provider struct {
 //
 //	ligo.Value("config-value")
 //	ligo.Value(&Config{Debug: true})
-func Value[T any](instance T) Provider {
-	return Provider{
+//
+// With hooks:
+//
+//	ligo.Value(&Database{db: db}, ligo.WithHooks(
+//	    ligo.OnShutdown(func(db *Database) error { return db.Close() }),
+//	))
+func Value[T any](instance T, opts ...ProviderOption) Provider {
+	p := Provider{
 		typ:   reflect.TypeFor[T](),
 		eager: instance,
 	}
+	for _, opt := range opts {
+		opt(&p)
+	}
+	return p
 }
 
 // Factory registers a factory function that produces a singleton.
 // The function can have dependencies as parameters; they are auto-injected.
 // The factory is called once, and the result is cached for subsequent resolutions.
 //
-// Example:
+// Hooks can be attached using WithHooks:
 //
 //	ligo.Factory[*UserService](func(repo *UserRepository) *UserService {
 //	    return NewUserService(repo)
-//	})
-func Factory[T any](fn any) Provider {
-	return Provider{
+//	}, ligo.WithHooks(
+//	    ligo.OnInit(func(svc *UserService) error { ... }),
+//	))
+func Factory[T any](fn any, opts ...ProviderOption) Provider {
+	p := Provider{
 		typ: reflect.TypeFor[T](),
 		fn:  fn,
 	}
+	for _, opt := range opts {
+		opt(&p)
+	}
+	return p
 }
 
 // Transient registers a factory function that produces a new instance on each resolve.
@@ -53,11 +74,50 @@ func Factory[T any](fn any) Provider {
 //
 //	ligo.Transient[*RequestContext](func() *RequestContext {
 //	    return NewRequestContext()
-//	})
-func Transient[T any](fn any) Provider {
-	p := Factory[T](fn)
+//	}, ligo.WithHooks(
+//	    ligo.OnInit(func(ctx *RequestContext) error { ... }),
+//	))
+func Transient[T any](fn any, opts ...ProviderOption) Provider {
+	p := Factory[T](fn, opts...)
 	p.transient = true
 	return p
+}
+
+// HookedFactory registers a factory function and enables explicit hook registration
+// via a Register method on the created instance. This provides compile-time safety
+// for hook method expressions.
+//
+// The created instance can implement:
+//
+//	type Registerable interface {
+//	    Register(*lifecycle.HookRegistry)
+//	}
+//
+// Example:
+//
+//	type Database struct {
+//	    db *sql.DB
+//	}
+//
+//	func (d *Database) Connect() error {
+//	    d.db = sql.Open("postgres", "dsn")
+//	    return nil
+//	}
+//
+//	func (d *Database) Close() error {
+//	    return d.db.Close()
+//	}
+//
+//	// Register method enables compile-time safe hook registration
+//	func (d *Database) Register(r *lifecycle.HookRegistry) {
+//	    r.OnInit(d.Connect)    // Method expression - compile-time checked
+//	    r.OnShutdown(d.Close)  // If Close doesn't exist → compile error
+//	}
+//
+//	// Provider registration
+//	ligo.HookedFactory(NewDatabase)
+func HookedFactory[T any](fn any) Provider {
+	return Factory[T](fn, WithHooks())
 }
 
 // Type returns the type this provider produces.
@@ -97,4 +157,35 @@ func (p Provider) Fn() any {
 // Eager returns the eager value if set (for internal use).
 func (p Provider) Eager() any {
 	return p.eager
+}
+
+// Hooks returns the hook registry if set (for internal use).
+func (p Provider) Hooks() *lifecycle.HookRegistry {
+	return p.hooks
+}
+
+// ProviderOption is a functional option for configuring providers.
+type ProviderOption func(*Provider)
+
+// WithHooks attaches lifecycle hooks to a provider.
+//
+// Example:
+//
+//	ligo.Factory[*Database](NewDatabase,
+//	    ligo.WithHooks(
+//	        ligo.OnInit(func(db *Database) error {
+//	            var err error
+//	            db.conn = sql.Open("postgres", "dsn")
+//	            return err
+//	        }),
+//	        ligo.BeforeShutdown(func(db *Database) error {
+//	            return db.conn.Close()
+//	        }),
+//	    ),
+//	)
+func WithHooks(hooks ...HookOption) ProviderOption {
+	registry := Hooks(hooks...)
+	return func(p *Provider) {
+		p.hooks = registry
+	}
 }

@@ -3,7 +3,10 @@ package ligo
 // Package ligo provides module system for organizing application functionality
 // into self-contained units with providers, controllers, and middleware.
 
-import "github.com/linkeunid/ligo/internal/core/module"
+import (
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
+	"github.com/linkeunid/ligo/internal/core/module"
+)
 
 // Module represents a self-contained unit of functionality that encapsulates
 // providers, controllers, middleware, and lifecycle hooks.
@@ -102,6 +105,26 @@ func OnModuleInit(fn func() error) module.ModuleOption {
 //	})
 func OnModuleDestroy(fn func() error) module.ModuleOption {
 	return module.OnModuleDestroy(fn)
+}
+
+// WithModuleHooks adds explicit lifecycle hooks to the module.
+// This is an alternative to OnModuleInit/OnModuleDestroy for more control.
+//
+// Example:
+//
+//	ligo.NewModule("user",
+//	    ligo.Providers(...),
+//	    ligo.WithModuleHooks(
+//	        ligo.OnInit(func() error { ... }),
+//	        ligo.OnDestroy(func() error { ... }),
+//	    ),
+//	)
+func WithModuleHooks(opts ...ModuleHookOption) module.ModuleOption {
+	registry := lifecycle.NewModuleHookRegistry()
+	for _, opt := range opts {
+		opt(registry)
+	}
+	return module.Hooks(registry)
 }
 
 // Dynamic creates a module option for dynamic modules with configuration options.

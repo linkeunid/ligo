@@ -27,6 +27,7 @@ type ProviderEntry struct {
 	argTypes  []reflect.Type
 	transient bool
 	exported  bool
+	hookRegistry any // *lifecycle.HookRegistry for RegisterFrom call after instance creation
 }
 
 // New creates a new DI container.
@@ -251,6 +252,14 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 				Cause:      err,
 			}
 		}
+
+		// Call RegisterFrom if hook registry is set (for explicit hook registration)
+		if entry.hookRegistry != nil {
+			if reg, ok := entry.hookRegistry.(interface{ RegisterFrom(any) }); ok {
+				reg.RegisterFrom(instance)
+			}
+		}
+
 		return instance, nil
 	}
 
@@ -318,12 +327,13 @@ func chainToStrings(chain []reflect.Type) []string {
 }
 
 // NewEntry creates a provider entry for registration.
-func NewEntry(factory func(args []reflect.Value) (any, error), eager any, argTypes []reflect.Type, transient, exported bool) ProviderEntry {
+func NewEntry(factory func(args []reflect.Value) (any, error), eager any, argTypes []reflect.Type, transient, exported bool, hookRegistry any) ProviderEntry {
 	return ProviderEntry{
-		factory:   factory,
-		eager:     eager,
-		argTypes:  argTypes,
-		transient: transient,
-		exported:  exported,
+		factory:      factory,
+		eager:        eager,
+		argTypes:     argTypes,
+		transient:    transient,
+		exported:     exported,
+		hookRegistry: hookRegistry,
 	}
 }

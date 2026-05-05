@@ -4,7 +4,7 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-217%20passing-brightgreen)](https://github.com/linkeunid/ligo)
 [![Coverage](https://img.shields.io/badge/coverage-48.9%25-yellow)](https://github.com/linkeunid/ligo)
 
 > **Note:** Ligo **v1.0** is ready. All requirements completed including comprehensive documentation, integration tests, performance benchmarks, and stability guarantees.

@@ -314,6 +314,46 @@ app.Register(ligo.NewModule("worker",
 app.Run() // Blocks until Ctrl+C, worker runs in background
 ```
 
+**Compile-Time Safe Hook Registration (HookedFactory):**
+
+For compile-time safety (catching typos in hook method names at compile time), use the `HookedFactory` pattern with the `Register` method:
+
+```go
+type Database struct {
+    db *sql.DB
+}
+
+func (d *Database) Connect() error {
+    var err error
+    d.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (d *Database) Close() error {
+    return d.db.Close()
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+// Method expressions like d.Connect are type-checked by the compiler.
+func (d *Database) Register(r *ligo.HookRegistry) {
+    r.OnInit(d.Connect)     // If Connect doesn't exist → compile error
+    r.OnShutdown(d.Close)   // Typo "Conenct" → compile error
+}
+
+// Provider registration
+ligo.Providers(
+    ligo.HookedFactory[*Database](NewDatabase),
+    // OR with Value:
+    ligo.Value(database, ligo.WithHooks()),
+)
+```
+
+**Benefits of HookedFactory:**
+- **Compile-time safety**: Method typos like `OnModulInit` instead of `OnModuleInit` are caught by the compiler
+- **Explicit registration**: Clear what hooks are registered via the `Register` method
+- **Same flexibility**: Only implement the hooks you need
+- **Works for both Factory and Value providers**: Use `HookedFactory[T]()` or `Value(v, WithHooks())`
+
 ---
 
 ## Package Ecosystem

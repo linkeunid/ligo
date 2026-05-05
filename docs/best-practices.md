@@ -531,6 +531,44 @@ func (s *DatabaseService) OnApplicationShutdown() error {
 - **Provider-level hooks** (interface methods) — Service-specific initialization like DB connections
 - **App-level hooks** (`ligo.OnStart(fn)`) — Cross-cutting concerns like global logging setup
 
+### Compile-Time Safe Hook Registration
+
+For compile-time safety (catching typos in hook method names), use the `HookedFactory` pattern with explicit hook registration:
+
+```go
+type Database struct {
+    db *sql.DB
+}
+
+func (d *Database) Connect() error {
+    var err error
+    d.db = sql.Open("postgres", "dsn")
+    return err
+}
+
+func (d *Database) Close() error {
+    return d.db.Close()
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+func (d *Database) Register(r *ligo.HookRegistry) {
+    r.OnInit(d.Connect)     // If Connect doesn't exist → compile error
+    r.OnShutdown(d.Close)   // Typo "Conenct" → compile error
+}
+
+// Provider registration
+ligo.Providers(
+    ligo.HookedFactory[*Database](NewDatabase),
+    // OR with Value:
+    ligo.Value(database, ligo.WithHooks()),
+)
+```
+
+**Benefits:**
+- **Compile-time safety**: Method typos caught by compiler
+- **Explicit**: Clear what hooks are registered
+- **Flexible**: Only implement the hooks you need
+
 **Execution order:**
 1. Module `OnModuleInit` functions
 2. Provider `OnModuleInit` methods

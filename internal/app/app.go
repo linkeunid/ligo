@@ -20,13 +20,46 @@ type Provider interface {
 	Eager() any
 	IsTransient() bool
 	IsExported() bool
+	Hooks() *lifecycle.HookRegistry
 }
 
 // BuildProviderEntry builds a container entry from a provider and returns its lifecycle hooks.
 func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
+	// Start with explicit hooks if registered
+	var hooks lifecycle.Hooks
+	if registry := p.Hooks(); registry != nil {
+		hooks = registry.ToHooks()
+	}
+
 	if p.Eager() != nil {
-		hooks := lifecycle.CollectHooks(p.Eager())
-		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported()), hooks
+		// For eager providers, call RegisterFrom if explicit registry exists
+		// This allows services to explicitly register their hooks with compile-time safety
+		if registry := p.Hooks(); registry != nil {
+			registry.RegisterFrom(p.Eager())
+			hooks = registry.ToHooks()
+		}
+
+		// Also collect interface-based hooks for backward compatibility
+		// Explicit hooks take precedence over interface-based hooks
+		if hooks.OnInit == nil || hooks.OnBootstrap == nil || hooks.OnBeforeShutdown == nil || hooks.OnDestroy == nil || hooks.OnShutdown == nil {
+			interfaceHooks := lifecycle.CollectHooks(p.Eager())
+			if hooks.OnInit == nil {
+				hooks.OnInit = interfaceHooks.OnInit
+			}
+			if hooks.OnBootstrap == nil {
+				hooks.OnBootstrap = interfaceHooks.OnBootstrap
+			}
+			if hooks.OnBeforeShutdown == nil {
+				hooks.OnBeforeShutdown = interfaceHooks.OnBeforeShutdown
+			}
+			if hooks.OnDestroy == nil {
+				hooks.OnDestroy = interfaceHooks.OnDestroy
+			}
+			if hooks.OnShutdown == nil {
+				hooks.OnShutdown = interfaceHooks.OnShutdown
+			}
+		}
+		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported(), nil), hooks
 	}
 
 	fn := reflect.ValueOf(p).MethodByName("Fn").Call([]reflect.Value{})[0].Interface()
@@ -44,9 +77,9 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 			return nil, fmt.Errorf("ligo: factory function must return a value")
 		}
 		return out[0].Interface(), nil
-	}, nil, argTypes, p.IsTransient(), p.IsExported())
+	}, nil, argTypes, p.IsTransient(), p.IsExported(), p.Hooks())
 
-	return entry, lifecycle.Hooks{} // Eager providers have hooks, factories don't know yet
+	return entry, hooks // Explicit hooks are stored for factory providers
 }
 
 // RegisterProvider registers a provider in the container and returns its lifecycle hooks.
@@ -79,8 +112,8 @@ func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHo
 			modContainer.Register(provider.Type(), entry)
 		}
 
-		// Collect hooks if any are implemented
-		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnBeforeShutdown != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil {
+		// Collect hooks if any are implemented or if registry is set (for HookedFactory pattern)
+		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnBeforeShutdown != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil || providerHooks.HasRegistry() {
 			hooks.Providers = append(hooks.Providers, providerHooks)
 		}
 	}
@@ -90,6 +123,16 @@ func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHo
 	}
 	if len(mod.OnDestroy) > 0 {
 		hooks.OnDestroy = append(hooks.OnDestroy, mod.OnDestroy)
+	}
+
+	// Handle explicit module hooks registry
+	if mod.Hooks != nil {
+		if initHooks := mod.Hooks.GetInitHooks(); len(initHooks) > 0 {
+			hooks.OnInit = append(hooks.OnInit, initHooks)
+		}
+		if destroyHooks := mod.Hooks.GetDestroyHooks(); len(destroyHooks) > 0 {
+			hooks.OnDestroy = append(hooks.OnDestroy, destroyHooks)
+		}
 	}
 
 	for _, child := range mod.Imports {

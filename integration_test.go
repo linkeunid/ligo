@@ -14,6 +14,49 @@ import (
 	"github.com/linkeunid/ligo/adapters/echo"
 )
 
+// TestDatabase is a test service that implements Register for compile-time safe hook registration.
+type TestDatabase struct {
+	conn          string
+	initCalled    *atomic.Bool
+	shutdownCalled *atomic.Bool
+}
+
+// Connect establishes the database connection.
+func (d *TestDatabase) Connect() error {
+	d.conn = "connected"
+	if d.initCalled != nil {
+		d.initCalled.Store(true)
+	}
+	return nil
+}
+
+// Close closes the database connection.
+func (d *TestDatabase) Close() error {
+	d.conn = ""
+	if d.shutdownCalled != nil {
+		d.shutdownCalled.Store(true)
+	}
+	return nil
+}
+
+// Register implements the Registerable interface for compile-time safe hook registration.
+// Method expressions like d.Connect are type-checked by the compiler.
+func (d *TestDatabase) Register(r *ligo.HookRegistry) {
+	r.OnInit(d.Connect)    // If Connect doesn't exist → compile error
+	r.OnShutdown(d.Close)  // If Close doesn't exist → compile error
+}
+
+// TestController is a test controller that forces TestDatabase resolution.
+type TestController struct {
+	db *TestDatabase
+}
+
+// RegisterRoutes registers the controller routes.
+func (c *TestController) RegisterRoutes(r ligo.Router) {
+	// Force database resolution
+	_ = c.db
+}
+
 // TestAppLifecycle tests the complete application lifecycle from creation to shutdown.
 func TestAppLifecycle(t *testing.T) {
 	t.Run("full lifecycle with graceful shutdown", func(t *testing.T) {
@@ -1049,6 +1092,151 @@ func TestLifecycleHooks(t *testing.T) {
 		}
 		if !foundFirst || !foundSecond {
 			t.Errorf("missing init calls. Got: %v", calls)
+		}
+	})
+}
+
+// TestExplicitHookRegistration tests the explicit hook registration API.
+func TestExplicitHookRegistration(t *testing.T) {
+	t.Run("provider with explicit hooks", func(t *testing.T) {
+		var initCalled, shutdownCalled atomic.Bool
+
+		app := ligo.New()
+		app.Register(
+			ligo.NewModule("test",
+				ligo.Providers(
+					ligo.Value(&struct{}{},
+						ligo.WithHooks(
+							ligo.OnInit(func() error {
+								initCalled.Store(true)
+								return nil
+							}),
+							ligo.OnShutdown(func() error {
+								shutdownCalled.Store(true)
+								return nil
+							}),
+						),
+					),
+				),
+			),
+		)
+
+		// Run in background
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Run()
+		}()
+
+		// Give time for init hook to execute
+		time.Sleep(200 * time.Millisecond)
+
+		if !initCalled.Load() {
+			t.Error("OnInit hook was not called")
+		}
+
+		// Send shutdown signal
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+
+		<-errCh
+
+		if !shutdownCalled.Load() {
+			t.Error("OnShutdown hook was not called")
+		}
+	})
+
+	t.Run("module with explicit hooks", func(t *testing.T) {
+		var moduleInitCalled, moduleDestroyCalled atomic.Bool
+
+		app := ligo.New()
+		app.Register(
+			ligo.NewModule("test",
+				ligo.WithModuleHooks(
+					ligo.ModuleInit(func() error {
+						moduleInitCalled.Store(true)
+						return nil
+					}),
+					ligo.ModuleDestroy(func() error {
+						moduleDestroyCalled.Store(true)
+						return nil
+					}),
+				),
+			),
+		)
+
+		// Run in background
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Run()
+		}()
+
+		// Give time for init hook to execute
+		time.Sleep(200 * time.Millisecond)
+
+		if !moduleInitCalled.Load() {
+			t.Error("Module OnInit hook was not called")
+		}
+
+		// Send shutdown signal
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+
+		<-errCh
+
+		if !moduleDestroyCalled.Load() {
+			t.Error("Module OnDestroy hook was not called")
+		}
+	})
+}
+
+// TestHookedFactory_RegisterMethod tests the HookedFactory pattern where services
+// explicitly register their hooks via a Register method, enabling compile-time safety.
+func TestHookedFactory_RegisterMethod(t *testing.T) {
+	t.Run("service with Register method for compile-time safe hooks", func(t *testing.T) {
+		var initCalled, shutdownCalled atomic.Bool
+
+		db := &TestDatabase{
+			initCalled:    &initCalled,
+			shutdownCalled: &shutdownCalled,
+		}
+
+		// Module using Value with Hooks - RegisterFrom is called immediately for eager providers
+		testModule := ligo.NewModule("test",
+			ligo.Providers(
+				ligo.Value(db, ligo.WithHooks()),
+			),
+		)
+
+		app := ligo.New()
+		app.Register(testModule)
+
+		// Run in background
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- app.Run()
+		}()
+
+		// Give time for init hook to execute
+		time.Sleep(200 * time.Millisecond)
+
+		if !initCalled.Load() {
+			t.Error("Database OnInit hook was not called")
+		}
+
+		// Send shutdown signal
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+
+		<-errCh
+
+		if !shutdownCalled.Load() {
+			t.Error("Database OnShutdown hook was not called")
 		}
 	})
 }
