@@ -99,19 +99,42 @@ func (c *helloController) Hello(ctx ligo.Context) error {
 - [Exception Filters](docs/features/exception-filters.md) - Error handling and HTTP response conversion
 - [DI Container](docs/features/di-container.md) - How the DI container works
 
-## Roadmap
+## CLI
 
-- [x] **Current Version:** v0.6.0 (All requirements completed)
-- **Test Coverage:** 207 tests passing, 48.9% coverage
-- **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
-- **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
+Scaffold projects and generate Clean Architecture boilerplate with **[ligo-cli](https://github.com/linkeunid/ligo-cli)**:
 
-See [Roadmaps](docs/roadmaps/) for:
-  - [x] [1.0 Release Plan](docs/roadmaps/1.0-release.md) - Complete
-  - [Package Ecosystem](docs/roadmaps/ecosystem.md) - Separate packages for DB, microservices, etc.
-  - [Microservices Guide](docs/microservices.md) - How to build distributed systems with Ligo
-  - [Future Features](docs/roadmaps/future-features.md) - WebSocket, GraphQL, Scheduling
-  - [Adapter Proposals](docs/roadmaps/adapter-proposals.md) - Fiber, Gin, Chi adapters
+```bash
+go install github.com/linkeunid/ligo-cli/cmd/ligo@latest
+```
+
+```bash
+ligo new my-app            # scaffold a new project
+ligo new my-app --full     # full boilerplate (users, file upload, auth)
+ligo new my-app --runner   # background worker/runner
+
+ligo g res product         # generate all layers (entity, usecase, repo, controller, module)
+ligo g co product --full   # generate controller only
+ligo g run email           # generate background worker
+
+ligo serve                 # go run ./cmd/api/
+ligo serve --watch         # auto-reload on file changes
+ligo work email            # run a background worker
+ligo build                 # go build -o bin/app ./cmd/api/
+```
+
+See [ligo-cli](https://github.com/linkeunid/ligo-cli) for the full command reference.
+
+## Ecosystem
+
+| Package | Description |
+|---------|-------------|
+| [ligo](https://github.com/linkeunid/ligo) | Core framework |
+| [ligo-cli](https://github.com/linkeunid/ligo-cli) | CLI — scaffolding and code generation |
+| [ligo-boilerplate](https://github.com/linkeunid/ligo-boilerplate) | Starter project with Clean Architecture |
+| [ligo-memory](https://github.com/linkeunid/ligo-memory) | In-memory store for dev/testing |
+| [ligo-validator](https://github.com/linkeunid/ligo-validator) | Validator provider |
+
+**Coming next:** `ligo-microservices` (RabbitMQ), `ligo-db` (pgx, no ORM), `ligo-schedule`, `ligo-ws` — see [Sneak Peek](docs/roadmaps/sneak-peek.md).
 
 ## Examples
 
@@ -122,8 +145,6 @@ See the [ligo-boilerplate](https://github.com/linkeunid/ligo-boilerplate) reposi
 - **File Upload** - Multipart file upload with streaming downloads
 
 See [Examples Guide](docs/examples.md) for detailed documentation and API usage.
-
-**Note:** Database integration and microservices will be provided as separate packages (like `@nestjs/typeorm` and `@nestjs/microservices`). See [Microservices Guide](docs/microservices.md) for implementation details.
 
 ## License
 
