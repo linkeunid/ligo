@@ -19,15 +19,12 @@ How Ligo separates concerns with optional packages for advanced features.
 - WebSocket, GraphQL, Scheduling packages
 - Comparison with NestJS ecosystem
 
-### [Future Features](./future-features.md)
-Proposed features for future releases.
-- Microservices (in progress)
-- WebSocket support
-- Task scheduling (cron jobs)
-- GraphQL support
-- OpenAPI/Swagger integration
-- Database integration
-- Caching layer
+### [Sneak Peek — What's Coming Next](./sneak-peek.md)
+Upcoming ecosystem packages in priority order.
+- **Priority 1:** Microservices + RabbitMQ (Request/Response + Pub-Sub)
+- **Priority 2:** Database module (pgx — raw SQL, full control, no ORM)
+- **Priority 2:** Task scheduling, WebSocket support
+- **Priority 3:** GraphQL, Swagger, Redis cache, MongoDB, gRPC
 
 ### [Adapter Proposals](./adapter-proposals.md)
 HTTP router adapter implementations and proposals.

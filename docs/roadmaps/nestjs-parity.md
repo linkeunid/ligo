@@ -77,14 +77,15 @@ NestJS uses TypeScript decorators. Ligo uses Go-idiomatic equivalents:
 
 | NestJS Package | Planned Ligo Package | Priority |
 |---|---|---|
-| `@nestjs/microservices` | `github.com/linkeunid/ligo/microservices` | High — in progress |
-| `@nestjs/schedule` | `github.com/linkeunid/ligo/schedule` | High |
-| `@nestjs/websockets` | `github.com/linkeunid/ligo/ws` | Medium |
-| `@nestjs/graphql` | `github.com/linkeunid/ligo/graphql` | Medium |
-| `@nestjs/swagger` | `github.com/linkeunid/ligo/swagger` | Medium |
-| `@nestjs/typeorm` equivalent | `github.com/linkeunid/ligo/database` | Medium (gorm, sqlx, ent) |
+| `@nestjs/microservices` | `github.com/linkeunid/ligo-microservices` | High — in active focus |
+| `@nestjs/typeorm` equivalent | `github.com/linkeunid/ligo-db` | High — after microservices (pgx, no ORM) |
+| `@nestjs/schedule` | `github.com/linkeunid/ligo-schedule` | Medium |
+| `@nestjs/websockets` | `github.com/linkeunid/ligo-ws` | Medium |
+| `@nestjs/graphql` | `github.com/linkeunid/ligo-graphql` | Medium |
+| `@nestjs/swagger` | `github.com/linkeunid/ligo-swagger` | Medium |
 | `@nestjs/passport` equivalent | External `ligo-auth-*` packages | Low |
-| `@nestjs/cache-manager` | `github.com/linkeunid/ligo/cache` | Low |
+| `@nestjs/cache-manager` | `github.com/linkeunid/ligo-cache` | Low |
+| `@nestjs/mongoose` equivalent | `github.com/linkeunid/ligo-mongodb` | Low (mongo-driver, no ODM) |
 | Health checks (Terminus) | External package or contrib | Low |
 
 ### Planned for Core
@@ -118,21 +119,20 @@ NestJS uses TypeScript decorators. Ligo uses Go-idiomatic equivalents:
 ## Ecosystem Map
 
 ```
-github.com/linkeunid/ligo          ← Core (v0.6.0) ✅
-github.com/linkeunid/ligo-memory   ← In-memory repository helpers ✅
+Available now:
+github.com/linkeunid/ligo            ← Core framework (v0.6.0) ✅
+github.com/linkeunid/ligo-cli        ← CLI scaffolding tool ✅
+github.com/linkeunid/ligo-boilerplate← Starter project ✅
+github.com/linkeunid/ligo-memory     ← In-memory store (dev/testing) ✅
+github.com/linkeunid/ligo-validator  ← Validator provider ✅
 
-Planned packages:
-github.com/linkeunid/ligo/microservices  ← TCP, Redis, RabbitMQ, NATS, Kafka
-github.com/linkeunid/ligo/schedule       ← Cron jobs, interval tasks
-github.com/linkeunid/ligo/ws             ← WebSocket hub, rooms, broadcasting
-github.com/linkeunid/ligo/graphql        ← Code-first schema, resolver DI, DataLoader
-github.com/linkeunid/ligo/swagger        ← OpenAPI spec generation
-github.com/linkeunid/ligo/database       ← DB integration (gorm, sqlx, ent)
-github.com/linkeunid/ligo/cache          ← Redis/memory caching module
-
-External (third-party) packages:
-github.com/linkeunid/ligo-auth-jwt       ← JWT auth strategies
-github.com/linkeunid/ligo-auth0          ← Auth0 integration
-github.com/linkeunid/ligo-cache-redis    ← Redis cache adapter
-github.com/linkeunid/ligo-database-pgx  ← PostgreSQL via pgx
+Planned:
+github.com/linkeunid/ligo-microservices  ← RabbitMQ, NATS, Kafka, Redis, TCP
+github.com/linkeunid/ligo-db            ← pgx pool + DI + typed repo (no ORM)
+github.com/linkeunid/ligo-schedule      ← Cron jobs, interval tasks
+github.com/linkeunid/ligo-ws            ← WebSocket hub, rooms, broadcasting
+github.com/linkeunid/ligo-graphql       ← Code-first schema, resolver DI, DataLoader
+github.com/linkeunid/ligo-swagger       ← OpenAPI spec generation
+github.com/linkeunid/ligo-cache         ← Redis/memory caching module
+github.com/linkeunid/ligo-mongodb       ← mongo-driver pool + DI + typed repo (no ODM)
 ```
