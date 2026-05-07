@@ -181,28 +181,11 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 
 // extractControllerName extracts the controller name from the constructor.
 func (b *Binder) extractControllerName(fn any) string {
-	fnType := reflect.TypeOf(fn)
-	if fnType.Kind() != reflect.Func {
+	name := logger.ExtractProviderName(fn)
+	if name == "unknown" || name == "" {
 		return "Controller"
 	}
-
-	// Try to get name from return type
-	if fnType.NumOut() > 0 {
-		retTyp := fnType.Out(0)
-		if retTyp.Kind() == reflect.Ptr {
-			retTyp = retTyp.Elem()
-		}
-		if retTyp.Name() != "" && retTyp.Name() != "Controller" {
-			return retTyp.Name()
-		}
-	}
-
-	// Fallback: extract from function name (NewUserController -> UserController)
-	fnName := fnType.Name()
-	if len(fnName) > 3 && fnName[:3] == "New" {
-		return fnName[3:]
-	}
-	return fnName
+	return name
 }
 
 // ErrControllerBinding is returned when a controller's dependency chain cannot be fully resolved.

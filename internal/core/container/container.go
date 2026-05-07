@@ -71,7 +71,6 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, exists := c.providers[typ]; exists {
-		// Duplicate provider - ignore and warn
 		if c.logger != nil {
 			c.logger.Warn("Duplicate provider ignored, using existing registration", logger.Field{Key: "type", Value: typ.String()})
 		}
@@ -79,7 +78,6 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	}
 	c.providers[typ] = entry
 
-	// Log provider registration
 	if c.logger != nil {
 		name := logger.ExtractProviderName(entry.eager)
 		if name == "unknown" && entry.factory != nil {
@@ -134,17 +132,7 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 		var matchEntry ProviderEntry
 		var implementors []string
 
-		c.mu.RLock()
-		for t, e := range c.providers {
-			if t.Implements(typ) {
-				implementors = append(implementors, t.String())
-				if matchType == nil {
-					matchType = t
-					matchEntry = e
-				}
-			}
-		}
-		c.mu.RUnlock()
+		matchType, matchEntry, implementors = c.findImplementors(typ)
 
 		switch len(implementors) {
 		case 0:
@@ -336,4 +324,26 @@ func NewEntry(factory func(args []reflect.Value) (any, error), eager any, argTyp
 		exported:     exported,
 		hookRegistry: hookRegistry,
 	}
+}
+
+// findImplementors searches for concrete types that implement the given interface.
+// Returns the first match, its entry, and all implementor names.
+func (c *Container) findImplementors(interfaceType reflect.Type) (reflect.Type, ProviderEntry, []string) {
+	var matchType reflect.Type
+	var matchEntry ProviderEntry
+	var implementors []string
+
+	c.mu.RLock()
+	for t, e := range c.providers {
+		if t.Implements(interfaceType) {
+			implementors = append(implementors, t.String())
+			if matchType == nil {
+				matchType = t
+				matchEntry = e
+			}
+		}
+	}
+	c.mu.RUnlock()
+
+	return matchType, matchEntry, implementors
 }

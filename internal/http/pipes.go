@@ -65,6 +65,20 @@ func Get[T any](ctx Context, key string) T {
 	return v
 }
 
+// TransformPipe creates a generic pipe that transforms a path parameter string to type T.
+// This reduces code duplication for similar transformation pipes.
+func TransformPipe[T any](param string, transform func(string) (T, error), pipeName string) Pipe {
+	return func(ctx Context) error {
+		str := ctx.Param(param)
+		result, err := transform(str)
+		if err != nil {
+			return fmt.Errorf("%s pipe: param %q: %w", pipeName, param, errors.Join(err, ErrBadRequest))
+		}
+		ctx.Set(param, result)
+		return nil
+	}
+}
+
 // tagRequired is the go-playground/validator tag name for the required constraint.
 // When required fails, the validator skips all subsequent tags on that field (hasValue check),
 // so a second pass is needed to surface min/email/oneof etc. for empty fields.
@@ -133,30 +147,14 @@ func validateExhaustive(v *validator.Validate, s any) error {
 // ParseIntPipe reads path parameter param, parses it as int, and stores the
 // result in ctx under param's name.
 func ParseIntPipe(param string) Pipe {
-	return func(ctx Context) error {
-		str := ctx.Param(param)
-		i, err := strconv.Atoi(str)
-		if err != nil {
-			return fmt.Errorf("parse int pipe: param %q is not a valid integer: %w", param, ErrBadRequest)
-		}
-		ctx.Set(param, i)
-		return nil
-	}
+	return TransformPipe(param, strconv.Atoi, "parse int")
 }
 
 // ParseBoolPipe reads path parameter param, parses it as bool, and stores the
 // result in ctx under param's name.
 // Accepts: 1, t, T, TRUE, true, True / 0, f, F, FALSE, false, False.
 func ParseBoolPipe(param string) Pipe {
-	return func(ctx Context) error {
-		str := ctx.Param(param)
-		b, err := strconv.ParseBool(str)
-		if err != nil {
-			return fmt.Errorf("parse bool pipe: param %q is not a valid boolean: %w", param, ErrBadRequest)
-		}
-		ctx.Set(param, b)
-		return nil
-	}
+	return TransformPipe(param, strconv.ParseBool, "parse bool")
 }
 
 // UUIDPipe validates that path parameter param is a valid UUID and stores it

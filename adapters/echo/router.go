@@ -2,15 +2,20 @@ package echo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
 
 	echo "github.com/labstack/echo/v5"
 	httpifc "github.com/linkeunid/ligo/internal/http"
 	"github.com/linkeunid/ligo/internal/core/container"
 	"github.com/linkeunid/ligo/internal/core/logger"
+	app "github.com/linkeunid/ligo/internal/app"
 )
 
 const errorMsgKey = "error"
@@ -80,7 +85,15 @@ func (a *Adapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
 // Serve starts the HTTP server.
 func (a *Adapter) Serve(addr string) error {
 	a.server = &http.Server{Addr: addr, Handler: a.e}
-	return a.server.ListenAndServe()
+	err := a.server.ListenAndServe()
+	if err != nil {
+		// Check for "address already in use" errors
+		var opErr *net.OpError
+		if errors.As(err, &opErr) && (opErr.Op == "listen" || strings.Contains(opErr.Error(), "address already in use") || strings.Contains(opErr.Error(), "EADDRINUSE")) {
+			return fmt.Errorf("%w: %v", app.ErrAddrInUse, err)
+		}
+	}
+	return err
 }
 
 // Shutdown gracefully shuts down the server.
@@ -140,10 +153,7 @@ func (g *groupAdapter) Serve(addr string) error {
 
 // wrapHandlerWithMiddleware applies middleware chain to handler.
 func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.HandlerFunc) echo.HandlerFunc {
-	wrapped := handler
-	for i := len(middleware) - 1; i >= 0; i-- {
-		wrapped = middleware[i](wrapped)
-	}
+	wrapped := httpifc.ApplyMiddleware(middleware, handler)
 	return func(c *echo.Context) error {
 		return wrapped(newContextAdapter(c))
 	}
@@ -155,11 +165,23 @@ type contextAdapter struct {
 	reqCont   *container.Container
 }
 
+var contextPool = sync.Pool{
+	New: func() any {
+		return &contextAdapter{
+			values: make(map[string]any),
+		}
+	},
+}
+
 func newContextAdapter(c *echo.Context) *contextAdapter {
-	return &contextAdapter{
-		c:      c,
-		values: make(map[string]any),
+	ctx := contextPool.Get().(*contextAdapter)
+	ctx.c = c
+	// Reset values map to avoid leaking data between requests
+	for k := range ctx.values {
+		delete(ctx.values, k)
 	}
+	ctx.reqCont = nil
+	return ctx
 }
 
 func (ca *contextAdapter) Request() *http.Request {

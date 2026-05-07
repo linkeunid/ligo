@@ -4,6 +4,16 @@ import (
 	"fmt"
 )
 
+// ApplyMiddleware applies middleware in reverse order to a handler.
+// This is a shared utility to avoid duplicating the reverse loop pattern.
+func ApplyMiddleware(middleware []Middleware, handler HandlerFunc) HandlerFunc {
+	wrapped := handler
+	for i := len(middleware) - 1; i >= 0; i-- {
+		wrapped = middleware[i](wrapped)
+	}
+	return wrapped
+}
+
 type routeBuilder struct {
 	router           Router
 	method           string
@@ -114,13 +124,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 	}
 
 	// Apply middleware
-	for i := len(rb.middleware) - 1; i >= 0; i-- {
-		mw := rb.middleware[i]
-		prev := wrapped
-		wrapped = func(ctx Context) error {
-			return mw(prev)(ctx)
-		}
-	}
+	wrapped = ApplyMiddleware(rb.middleware, wrapped)
 
 	// Wrap with exception filters
 	finalHandler := wrapped

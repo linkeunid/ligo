@@ -69,6 +69,10 @@ func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) 
 	}
 }
 
+const (
+	maxThrottleEntries = 10000
+)
+
 var (
 	throttleStore = make(map[string]*throttleEntry)
 	throttleMu    sync.Mutex
@@ -113,9 +117,28 @@ func startThrottleCleanup() {
 				}
 				entry.mu.Unlock()
 			}
+			// Enforce maximum entries to prevent unbounded memory growth
+			if len(throttleStore) > maxThrottleEntries {
+				evictOldestEntries()
+			}
 			throttleMu.Unlock()
 		}
 	}()
+}
+
+// evictOldestEntries removes oldest entries to maintain maxThrottleEntries limit.
+func evictOldestEntries() {
+	// Simple LRU-style eviction: remove entries with oldest last activity
+	// We'll remove 10% of entries to avoid frequent evictions
+	toRemove := (len(throttleStore) - maxThrottleEntries) + (maxThrottleEntries / 10)
+	count := 0
+	for key := range throttleStore {
+		if count >= toRemove {
+			break
+		}
+		delete(throttleStore, key)
+		count++
+	}
 }
 
 // AdminGuard is a convenience guard that checks for admin role.

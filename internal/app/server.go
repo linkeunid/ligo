@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +16,9 @@ import (
 )
 
 const maxPortRetries = 10
+
+// ErrAddrInUse is the typed error for address already in use.
+var ErrAddrInUse = errors.New("address already in use")
 
 // IncrementPort increments the port number in an address string.
 func IncrementPort(addr string) (string, error) {
@@ -33,13 +36,7 @@ func IncrementPort(addr string) (string, error) {
 
 // IsAddrInUse checks if the error is due to address already in use.
 func IsAddrInUse(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	return strings.Contains(errStr, "address already in use") ||
-		strings.Contains(errStr, "bind: address already in use") ||
-		strings.Contains(errStr, "EADDRINUSE")
+	return errors.Is(err, ErrAddrInUse)
 }
 
 // ServeOptions holds options for serving.

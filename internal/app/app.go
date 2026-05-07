@@ -13,6 +13,25 @@ import (
 	"github.com/linkeunid/ligo/internal/core/module"
 )
 
+// mergeHooks merges source hooks into destination, preserving non-nil destination hooks.
+func mergeHooks(destination *lifecycle.Hooks, source lifecycle.Hooks) {
+	if destination.OnInit == nil {
+		destination.OnInit = source.OnInit
+	}
+	if destination.OnBootstrap == nil {
+		destination.OnBootstrap = source.OnBootstrap
+	}
+	if destination.OnBeforeShutdown == nil {
+		destination.OnBeforeShutdown = source.OnBeforeShutdown
+	}
+	if destination.OnDestroy == nil {
+		destination.OnDestroy = source.OnDestroy
+	}
+	if destination.OnShutdown == nil {
+		destination.OnShutdown = source.OnShutdown
+	}
+}
+
 // Provider is the interface for dependency providers (re-exported from root package).
 // We use interface{} here to avoid circular import; the root package will type-assert.
 type Provider interface {
@@ -43,21 +62,7 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 		// Explicit hooks take precedence over interface-based hooks
 		if hooks.OnInit == nil || hooks.OnBootstrap == nil || hooks.OnBeforeShutdown == nil || hooks.OnDestroy == nil || hooks.OnShutdown == nil {
 			interfaceHooks := lifecycle.CollectHooks(p.Eager())
-			if hooks.OnInit == nil {
-				hooks.OnInit = interfaceHooks.OnInit
-			}
-			if hooks.OnBootstrap == nil {
-				hooks.OnBootstrap = interfaceHooks.OnBootstrap
-			}
-			if hooks.OnBeforeShutdown == nil {
-				hooks.OnBeforeShutdown = interfaceHooks.OnBeforeShutdown
-			}
-			if hooks.OnDestroy == nil {
-				hooks.OnDestroy = interfaceHooks.OnDestroy
-			}
-			if hooks.OnShutdown == nil {
-				hooks.OnShutdown = interfaceHooks.OnShutdown
-			}
+			mergeHooks(&hooks, interfaceHooks)
 		}
 		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported(), nil), hooks
 	}
