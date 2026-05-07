@@ -499,18 +499,17 @@ module github.com/linkeunid/ligo-cache-redis
 go 1.21
 
 require (
-    github.com/linkeunid/ligo v1.0.0  // Core framework
+    github.com/linkeunid/ligo v0.6.0  // Core framework
     github.com/redis/go-redis/v9 v9.0.0
 )
 ```
 
 ### Ligo Version Compatibility
 
-| Ligo Version | External Package Compatible? |
-|---------------|----------------------------|
-| 1.0.x         | Yes (stable API)                |
-| 1.1.x         | Yes (backward compatible)       |
-| 2.0.x         | Maybe (check breaking changes)   |
+| Ligo Version | External Package Compatible? | Notes |
+|---------------|----------------------------|-------|
+| 0.5.x         | Yes (stable API) | Feature-complete release |
+| 0.6.x         | Yes (no public API changes) | Internal restructuring only |
 
 ---
 
@@ -526,7 +525,7 @@ Keep core framework small:
 
 External packages can only use public Ligo API:
 - ✅: `ligo.NewModule`, `ligo.Providers`, `ligo.Factory`
-- ❌: `internal/core/container`, `internal/app/*`
+- ❌: `internal/di`, `internal/app/*` (any `internal/` package)
 
 ### 3. Module Factory
 

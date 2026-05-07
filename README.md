@@ -4,10 +4,10 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-217%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-207%20passing-brightgreen)](https://github.com/linkeunid/ligo)
 [![Coverage](https://img.shields.io/badge/coverage-48.9%25-yellow)](https://github.com/linkeunid/ligo)
 
-> **Note:** Ligo **v1.0** is ready. All requirements completed including comprehensive documentation, integration tests, performance benchmarks, and stability guarantees.
+> **Note:** Ligo **v0.6.0** is available. See the [Release Notes](docs/migration.md) for details.
 
 ## Features
 
@@ -24,7 +24,11 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 ## Installation
 
 ```bash
-go get github.com/linkeunid/ligo
+# Get the latest version (v0.6.0)
+go get github.com/linkeunid/ligo@latest
+
+# Or specify a version
+go get github.com/linkeunid/ligo@v0.6.0
 ```
 
 ## Quick Start
@@ -74,7 +78,7 @@ func (c *helloController) Hello(ctx ligo.Context) error {
 
 **Guides:**
 - [Examples Guide](docs/examples.md) - Detailed documentation and API usage
-- [Migration Guide](docs/migration.md) - Migrating from 0.x to 1.0
+- [Migration Guide](docs/migration.md) - Migrating from 0.x to 0.6.0
 - [Best Practices](docs/best-practices.md) - Development patterns and conventions
 - [Performance Tuning](docs/performance-tuning.md) - Optimization and profiling
 - [Deployment Guide](docs/deployment.md) - Docker, Kubernetes, Cloud platforms
@@ -97,8 +101,8 @@ func (c *helloController) Hello(ctx ligo.Context) error {
 
 ## Roadmap
 
-- [x] **Current Version:** 1.0 (All requirements completed)
-- **Test Coverage:** 208 tests passing, 50.4% coverage
+- [x] **Current Version:** v0.6.0 (All requirements completed)
+- **Test Coverage:** 207 tests passing, 48.9% coverage
 - **Documentation:** Complete (API guides, migration, best practices, performance, deployment, stability, microservices)
 - **Next:** `github.com/linkeunid/ligo/microservices` - Message brokers, event-driven architecture
 

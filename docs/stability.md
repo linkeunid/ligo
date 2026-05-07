@@ -12,10 +12,11 @@ Ligo follows [Semantic Versioning 2.0.0](https://semver.org/).
 
 ### Version Examples
 
-- `1.0.0` - First stable release
-- `1.1.0` - New features added, backwards compatible
-- `1.1.1` - Bug fix
-- `2.0.0` - Breaking changes introduced
+- `0.5.0` - First feature-complete release
+- `0.6.0` - Internal restructuring (di package, HTTP subdirectories)
+
+
+
 
 ## Public API Audit
 
@@ -122,7 +123,7 @@ The following public APIs are considered stable and will follow semantic version
 ### Deprecation Example
 
 ```go
-// Deprecated: Use WithLoggerJSON() instead. Will be removed in v2.0.0.
+// Deprecated: Use WithLoggerJSON() instead. Will be removed in a future version.
 func WithProduction() Option {
     return WithLoggerJSON()
 }
@@ -130,7 +131,7 @@ func WithProduction() Option {
 
 ## Breaking Changes Policy
 
-Breaking changes will only occur in major version updates (e.g., 1.0.0 → 2.0.0).
+Breaking changes will only occur in major version updates (e.g., 0.5.x → 0.6.x).
 
 ### Examples of Breaking Changes
 
@@ -157,7 +158,7 @@ When breaking changes are introduced:
 
 ### Stable Release Criteria
 
-A version is considered stable (1.0.0+) when:
+A version is considered stable when:
 
 1. All public APIs are documented
 2. Test coverage is ≥ 80%
@@ -185,8 +186,8 @@ For major versions:
 
 | Version | Status          | Support Until |
 |---------|-----------------|---------------|
-| 0.9.x   | Pre-release     | N/A           |
-| 1.0.x   | Stable (target) | TBD           |
+| 0.5.x   | Pre-release     | N/A           |
+| 0.6.x   | Stable (current)| Supported     |
 
 ## Feedback and Contributions
 
@@ -200,5 +201,5 @@ Users are encouraged to:
 ## Additional Resources
 
 - [Release Roadmap](roadmaps/1.0-release.md)
-- [Migration Guide](migration.md) (to be created)
+- [Migration Guide](migration.md)
 - [Best Practices](best-practices.md) (to be created)

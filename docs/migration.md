@@ -1,23 +1,33 @@
-# Migration Guide: 0.x → 1.0
+# Migration Guide
 
-This guide helps you migrate your Ligo applications from 0.x versions to 1.0.
+This guide helps you migrate your Ligo applications between versions.
+
+## [Migration Guide: 0.x → 0.5](#0x-→-05)
+
+## [Migration Guide: 0.5 → 0.6](#05-→-06)
+
+---
+
+## 0.x → 0.5
+
+This guide helps you migrate your Ligo applications from 0.x versions to 0.5.
 
 ## Overview
 
-Ligo 1.0 is a major milestone that establishes the stable public API. While most code will work without changes, there are some important updates to be aware of.
+Ligo 0.5 is a feature-complete release that establishes the stable public API. While most code will work without changes, there are some important updates to be aware of.
 
 ## Breaking Changes
 
 ### None Expected
 
-As of 0.9, no breaking changes are planned for 1.0. The 1.0 release primarily:
+As of 0.4, no breaking changes are planned for 0.5. The 1.0 release primarily:
 
 - Finalizes the public API
 - Completes documentation
 - Achieves target test coverage
 - Establishes stability guarantees
 
-## New Features in 1.0
+## New Features in 0.5
 
 ### Built-in Pipes
 
@@ -190,7 +200,7 @@ go mod tidy
 
 ### 2. Update Imports
 
-No import changes needed for 1.0.
+No import changes needed for 0.5.
 
 ### 3. Review Your Code
 
@@ -259,7 +269,7 @@ go run ./cmd/your-app
 
 ### Go Version
 
-Ligo 1.0 requires Go 1.21 or later.
+Ligo 0.5 requires Go 1.21 or later.
 
 ### Echo Adapter
 
@@ -283,7 +293,7 @@ If you encounter issues after upgrading:
 
 ```bash
 # Revert to previous version
-go get github.com/linkeunid/ligo@v0.9.0
+go get github.com/linkeunid/ligo@v0.5.0
 go mod tidy
 ```
 
@@ -297,7 +307,7 @@ If you encounter issues during migration:
 
 ## Summary
 
-Most applications will upgrade to 1.0 without code changes. The main opportunities are:
+Most applications will upgrade to 0.5 without code changes. The main opportunities are:
 
 1. Add validation pipes for better input validation
 2. Add guards for authorization
@@ -305,3 +315,119 @@ Most applications will upgrade to 1.0 without code changes. The main opportuniti
 4. Use typed pipes for route parameters
 
 These changes are optional but recommended for better code quality and maintainability.
+
+---
+
+## 0.5 → 0.6
+
+This guide helps you migrate from 0.5 to 0.6.
+
+## Overview
+
+Ligo 0.6 is an internal restructuring that improves code organization and maintainability. **The public API remains unchanged** - most applications will upgrade without any code changes.
+
+## Breaking Changes
+
+### For Framework Users: None ✅
+
+**No action required!** The public API is 100% backward compatible.
+
+All your existing code will continue to work:
+- All imports remain the same
+- All function signatures unchanged
+- All behavior preserved
+
+### For Framework Contributors: Internal Changes
+
+If you work on the Ligo framework itself, you'll need to update internal imports:
+
+**Before:**
+```go
+import "github.com/linkeunid/ligo/internal/core/container"
+```
+
+**After:**
+```go
+import "github.com/linkeunid/ligo/internal/di"
+```
+
+## What Changed in 0.6
+
+### Internal Package Reorganization
+
+1. **DI Container Package Renamed**
+   - Old: `internal/core/container`
+   - New: `internal/di`
+   - Reason: Clearer naming
+
+2. **HTTP Layer Split into Subdirectories**
+   - Old: Flat `internal/http/` (10 files)
+   - New: Organized subdirectories
+     - `internal/http/guards/` - Guard implementations
+     - `internal/http/pipes/` - Pipe implementations
+     - `internal/http/interceptors/` - Interceptor implementations
+   - Reason: Better code organization
+
+## Benefits
+
+- **Better Organization:** Related code grouped together
+- **Clearer Naming:** Package names reflect their purpose
+- **Easier Navigation:** Faster to find what you need
+- **Improved Maintainability:** Easier to understand and modify
+
+## Step-by-Step Migration
+
+### 1. Update Dependencies
+
+```bash
+go get -u github.com/linkeunid/ligo@v2.0.0
+go mod tidy
+```
+
+### 2. Verify Your Application
+
+```bash
+go test ./...
+go run ./cmd/your-app
+```
+
+### 3. (Framework Contributors Only) Update Internal Imports
+
+If you work on the Ligo framework codebase:
+
+```bash
+# Update internal imports
+find . -name "*.go" -type f -exec sed -i 's|internal/core/container|internal/di|g' {} \;
+```
+
+## Compatibility Notes
+
+### Go Version
+
+Ligo 0.6 requires Go 1.21 or later (same as 0.5).
+
+### Dependencies
+
+No new dependencies added in 0.6.
+
+### Public API
+
+The public API is unchanged - all your code will work as-is.
+
+## Rollback Plan
+
+If you encounter issues:
+
+```bash
+# Revert to previous version
+go get github.com/linkeunid/ligo@v0.5.0
+go mod tidy
+```
+
+## Summary
+
+**For Users:** No changes required - upgrade and go!
+
+**For Contributors:** Update internal imports from `core/container` to `di`.
+
+The 0.6 release is all about **internal improvements** with **zero breaking changes** for users.

@@ -39,7 +39,7 @@ import (
     
     "github.com/gofiber/fiber/v2"
     httpifc "github.com/linkeunid/ligo/internal/http"
-    "github.com/linkeunid/ligo/internal/core/container"
+    "github.com/linkeunid/ligo/internal/di"
     "github.com/linkeunid/ligo/internal/core/logger"
 )
 
@@ -48,7 +48,7 @@ type Adapter struct {
     app        *fiber.App
     middleware []httpifc.Middleware
     logger     logger.Logger
-    container  *container.Container
+    container  *di.Container
 }
 
 func NewAdapter() *Adapter {
@@ -59,7 +59,7 @@ func NewAdapter() *Adapter {
     }
 }
 
-func (a *Adapter) SetContainer(c *container.Container) {
+func (a *Adapter) SetContainer(c *di.Container) {
     a.container = c
 }
 

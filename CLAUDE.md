@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Run tests (217 tests passing, 48.9% coverage)
+# Run tests (207 tests passing, 48.9% coverage)
 # Count tests with: go test -v ./... 2>&1 | grep -c 'PASS:'
 go test ./...
 go test -v ./...
@@ -59,7 +59,7 @@ go mod tidy
 - [docs/features/](docs/features/) - Detailed feature documentation
 - [docs/examples.md](docs/examples.md) - Examples guide with API usage
 - [docs/roadmaps/](docs/roadmaps/) - Release roadmap and future proposals
-- [docs/migration.md](docs/migration.md) - Migration guide (0.x → 1.0)
+- [docs/migration.md](docs/migration.md) - Migration guide (0.x → 0.6.0)
 - [docs/best-practices.md](docs/best-practices.md) - Development best practices
 - [docs/performance-tuning.md](docs/performance-tuning.md) - Performance optimization guide
 - [docs/deployment.md](docs/deployment.md) - Deployment guide (Docker, Kubernetes, Cloud)
@@ -84,16 +84,20 @@ ligo/
 │   │   ├── app.go          # DI registration, module building
 │   │   ├── app_test.go     # App tests
 │   │   └── server.go       # Server startup, graceful shutdown, port retry
-│   ├── core/               # Core DI, module system, logger, lifecycle, resolver
-│   │   ├── container/      # DI container
+│   ├── core/               # Core logger, lifecycle, module system
 │   │   ├── logger/         # Structured logging
 │   │   ├── lifecycle/      # Lifecycle management
-│   │   ├── module/         # Module system
-│   │   └── resolver/       # Interface-based dependency resolution
+│   │   └── module/         # Module system
+│   ├── di/                 # Dependency injection
+│   │   ├── container.go    # DI container
+│   │   └── errors.go       # DI error types
 │   ├── http/               # HTTP interfaces + chain/builder + built-ins
-│   │   ├── guards.go       # Built-in guards (RolesGuard, ThrottleGuard, etc.)
-│   │   ├── interceptors.go # Built-in interceptors (Timeout, Logging)
-│   │   ├── pipes.go        # Built-in pipes (Validation, ParseInt, etc.)
+│   │   ├── guards/         # Guard implementations
+│   │   ├── pipes/          # Pipe implementations
+│   │   ├── interceptors/   # Interceptor implementations
+│   │   ├── guards.go       # Guard re-exports
+│   │   ├── interceptors.go # Interceptor re-exports
+│   │   ├── pipes.go        # Pipe re-exports
 │   │   ├── binder.go       # Controller registration with DI
 │   │   ├── builder.go      # RouteBuilder for chain pattern
 │   │   ├── chain.go        # ChainRouter for fluent API
@@ -106,7 +110,7 @@ ligo/
 │   └── echo/               # Echo v5 adapter
 ├── docs/
 │   ├── examples.md         # Examples guide
-│   ├── migration.md        # Migration guide (0.x → 1.0)
+│   ├── migration.md        # Migration guide (0.x → 0.6.0)
 │   ├── best-practices.md   # Development best practices
 │   ├── performance-tuning.md  # Performance optimization
 │   ├── deployment.md       # Deployment guide
@@ -119,7 +123,8 @@ ligo/
 ### Structure Principles
 - **Root files**: Minimal public API (11 files)
 - **internal/app/**: App implementation details (DI, server logic)
-- **internal/core/**: Framework core (DI container, module system, logger)
+- **internal/core/**: Framework core (logger, lifecycle, module system)
+- **internal/di/**: Dependency injection container
 - **internal/http/**: HTTP abstractions (adapter-agnostic interfaces + built-ins)
 - **internal/adapters/**: Concrete HTTP router implementations
 
@@ -213,7 +218,7 @@ func (c *Controller) Get(ctx ligo.Context) error {
 - All requirements completed:
   - ✅ API documentation (godoc comments)
   - ✅ Getting started guide
-  - ✅ Migration guide (0.x → 1.0)
+  - ✅ Migration guide (0.x → 0.6.0)
   - ✅ Best practices guide
   - ✅ Performance tuning guide
   - ✅ Deployment guide
