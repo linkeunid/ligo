@@ -13,12 +13,13 @@ import (
 
 // Container holds registered providers and resolves dependencies.
 type Container struct {
-	mu        sync.RWMutex
-	parent    *Container
-	providers map[reflect.Type]ProviderEntry
-	cache     sync.Map // map[reflect.Type]any — thread-safe cache
-	locks     sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
-	logger    logger.Logger
+	mu              sync.RWMutex
+	parent          *Container
+	providers       map[reflect.Type]ProviderEntry
+	cache           sync.Map // map[reflect.Type]any — thread-safe cache for resolved instances
+	locks           sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
+	interfaceCache  sync.Map // map[reflect.Type]reflect.Type — cache interface->concrete mappings
+	logger          logger.Logger
 }
 
 // ProviderEntry represents a registered provider in the container.
@@ -122,28 +123,46 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 	entry, ok := c.providers[typ]
 	c.mu.RUnlock()
 
-	// Interface fallback: scan for a concrete type that implements the interface.
+	// Interface fallback: check cache first, then scan for a concrete type that implements the interface.
 	requestedTyp := typ
 	if !ok && typ.Kind() == reflect.Interface {
-		var matchType reflect.Type
-		var matchEntry ProviderEntry
-		var implementors []string
-
-		matchType, matchEntry, implementors = c.findImplementors(typ)
-
-		switch len(implementors) {
-		case 0:
-			// no match — fall through to parent/missing
-		case 1:
-			entry, ok, typ = matchEntry, true, matchType
-			if c.logger != nil {
-				c.logger.LogWithContext(logger.ContextDIContainer, "Interface resolved",
-					logger.Field{Key: "interface", Value: requestedTyp.String()},
-					logger.Field{Key: "concrete", Value: matchType.String()},
-				)
+		// Check interface cache first
+		if cachedTyp, found := c.interfaceCache.Load(typ); found {
+			typ = cachedTyp.(reflect.Type)
+			c.mu.RLock()
+			entry, ok = c.providers[typ]
+			c.mu.RUnlock()
+			if !ok && c.parent != nil {
+				return c.parent.resolve(typ, chain)
 			}
-		default:
-			return nil, &ErrAmbiguousDependency{Interface: typ.String(), Implementors: implementors}
+			if !ok {
+				return nil, &ErrMissingDependency{Type: typ.String()}
+			}
+			// Found via cache, continue to singleton/transient resolution
+		} else {
+			// Cache miss: scan for implementors
+			var matchType reflect.Type
+			var matchEntry ProviderEntry
+			var implementors []string
+
+			matchType, matchEntry, implementors = c.findImplementors(typ)
+
+			switch len(implementors) {
+			case 0:
+				// no match — fall through to parent/missing
+			case 1:
+				entry, ok, typ = matchEntry, true, matchType
+				// Cache the interface->concrete mapping
+				c.interfaceCache.Store(requestedTyp, typ)
+				if c.logger != nil {
+					c.logger.LogWithContext(logger.ContextDIContainer, "Interface resolved",
+						logger.Field{Key: "interface", Value: requestedTyp.String()},
+						logger.Field{Key: "concrete", Value: matchType.String()},
+					)
+				}
+			default:
+				return nil, &ErrAmbiguousDependency{Interface: typ.String(), Implementors: implementors}
+			}
 		}
 	}
 

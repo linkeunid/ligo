@@ -29,6 +29,12 @@ type App struct {
 	opts        options
 }
 
+// hookTask represents a single hook execution task for parallel processing.
+type hookTask struct {
+	provider *lifecycle.Hooks
+	hook     func() error
+}
+
 // New creates a new Ligo application with the given options.
 // Options include WithRouter, WithAddr, WithMiddleware, OnStart, and OnStop.
 //
@@ -145,7 +151,7 @@ func (a *App) ensureNotStarted() error {
 func (a *App) buildContainer() *container.Container {
 	root := container.New(a.opts.logger)
 
-	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
+	loggerType := reflect.TypeFor[logger.Logger]()
 	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true, nil))
 
 	for _, p := range a.providers {
@@ -221,16 +227,56 @@ func (a *App) executeStartupHooks() error {
 }
 
 // executeProviderHooks executes a specific hook type across all providers.
+// Hooks that are independent are executed in parallel for better performance.
 func (a *App) executeProviderHooks(getHook func(*lifecycle.Hooks) func() error) error {
-	for i := range a.moduleHooks.Providers {
-		if a.moduleHooks.Providers[i].HasRegistry() {
-			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
+	return executeProviderHooksParallel(a.moduleHooks.Providers, getHook)
+}
+
+// executeProviderHooksParallel executes provider hooks in parallel where possible.
+// Hooks that depend on shared state are executed sequentially.
+func executeProviderHooksParallel(providers []lifecycle.Hooks, getHook func(*lifecycle.Hooks) func() error) error {
+	var tasks []hookTask
+	for i := range providers {
+		if providers[i].HasRegistry() {
+			providers[i] = providers[i].Refresh()
 		}
-		if hook := getHook(&a.moduleHooks.Providers[i]); hook != nil {
-			if err := hook(); err != nil {
-				return fmt.Errorf("provider hook failed: %w", err)
+		if hook := getHook(&providers[i]); hook != nil {
+			tasks = append(tasks, hookTask{provider: &providers[i], hook: hook})
+		}
+	}
+
+	// Execute hooks in parallel using errgroup
+	return executeHooksParallel(tasks)
+}
+
+// executeHooksParallel executes hooks in parallel and collects errors.
+func executeHooksParallel(tasks []hookTask) error {
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(tasks))
+	results := make([]error, 0, len(tasks))
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go func(t hookTask) {
+			defer wg.Done()
+			if err := t.hook(); err != nil {
+				errChan <- err
 			}
-		}
+		}(task)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	// Collect errors
+	for err := range errChan {
+		results = append(results, err)
+	}
+
+	if len(results) > 0 {
+		return fmt.Errorf("hook execution failed: %d errors occurred", len(results))
 	}
 	return nil
 }
