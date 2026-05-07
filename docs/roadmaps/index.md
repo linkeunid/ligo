@@ -4,6 +4,13 @@ This directory contains roadmaps and proposals for the Ligo framework.
 
 ## Documents
 
+### [NestJS Feature Parity](./nestjs-parity.md)
+What Ligo has adopted from NestJS and what is planned or intentionally different.
+- Full list of adopted features (core, pipeline, lifecycle hooks)
+- Planned separate packages (microservices, ws, graphql, schedule, swagger, database)
+- Go-idiomatic differences (builder pattern vs decorators)
+- Ecosystem map
+
 ### [Package Ecosystem](./ecosystem.md)
 How Ligo separates concerns with optional packages for advanced features.
 - Core framework scope
@@ -12,23 +19,15 @@ How Ligo separates concerns with optional packages for advanced features.
 - WebSocket, GraphQL, Scheduling packages
 - Comparison with NestJS ecosystem
 
-### [1.0 Release Roadmap](./1.0-release.md)
-Timeline and checklist for the 1.0 release.
-- Documentation requirements
-- Testing coverage goals
-- Stability guarantees
-- Example applications
-
 ### [Future Features](./future-features.md)
-Proposed features for post-1.0 releases.
+Proposed features for future releases.
+- Microservices (in progress)
 - WebSocket support
 - Task scheduling (cron jobs)
 - GraphQL support
-- gRPC support
 - OpenAPI/Swagger integration
-- Message queue integrations
+- Database integration
 - Caching layer
-- Distributed tracing
 
 ### [Adapter Proposals](./adapter-proposals.md)
 HTTP router adapter implementations and proposals.
@@ -37,6 +36,13 @@ HTTP router adapter implementations and proposals.
 - Gin (Proposed)
 - Chi (Proposed)
 - Stdlib (Proposed)
+
+### [0.6 Release](./1.0-release.md)
+Completed checklist for the v0.6.0 release.
+- Documentation requirements ✅
+- Testing coverage goals ✅
+- Stability guarantees ✅
+- Example applications ✅
 
 ---
 
@@ -54,7 +60,7 @@ If you want to work on any of these features:
 
 ## Version Policy
 
-- **0.9.x**: Bug fixes, minor improvements
-- **1.0**: Production-ready with stability guarantees
-- **1.x**: New features as separate packages (ws, schedule, graphql, etc.)
-- **2.0**: Breaking changes only if absolutely necessary
+- **0.5.x**: Feature-complete core, stabilization
+- **0.6.x**: Internal restructuring, performance improvements (current)
+- **0.7+**: New ecosystem packages (microservices, ws, graphql, schedule)
+- **1.0**: Breaking changes only if absolutely necessary
