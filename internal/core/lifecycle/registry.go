@@ -13,7 +13,7 @@ type HookRegistry struct {
 }
 
 // NewHookRegistry creates a new hook registry.
-func NewHookRegistry(_ any) *HookRegistry {
+func NewHookRegistry() *HookRegistry {
 	return &HookRegistry{}
 }
 

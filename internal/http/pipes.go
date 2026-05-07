@@ -86,6 +86,24 @@ const tagRequired = "required"
 
 // validateExhaustive runs two validation passes so fields that fail "required" also
 // report all other tag failures in the same response.
+//
+// Why Two Passes Are Needed:
+// The go-playground/validator library has a behavior where if a field fails the "required"
+// validation, it skips all other validation tags for that field. This means a user would
+// only see "required" error even if the field also fails "email", "min", etc.
+//
+// Two-Pass Strategy:
+// 1. First pass: Run normal validation, collect all errors
+// 2. If any "required" errors found:
+//    - Create a copy of the struct
+//    - Replace empty strings with "x" (passes required check)
+//    - Run validation again on the modified struct
+//    - Merge results from both passes
+//
+// Trade-offs:
+// - Pro: Users see all validation errors at once
+// - Con: Requires copying the entire struct (O(n) where n = struct size)
+// - Alternative: Would require forking validator library or using custom validator
 func validateExhaustive(v *validator.Validate, s any) error {
 	err1 := v.Struct(s)
 	if err1 == nil {

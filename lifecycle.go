@@ -160,7 +160,7 @@ type HookRegistryRef = *lifecycle.HookRegistry
 //	    ),
 //	)
 func Hooks(hooks ...HookOption) *lifecycle.HookRegistry {
-	registry := lifecycle.NewHookRegistry(nil)
+	registry := lifecycle.NewHookRegistry()
 	for _, h := range hooks {
 		h(registry)
 	}

@@ -171,7 +171,7 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 	// Try explicit hook registration first, then fall back to interface-based detection.
 	// This works for both HookedController (with Register method) and regular controllers.
 	if registerable, ok := capturedCtrl.(interface{ Register(*lifecycle.HookRegistry) }); ok {
-		registry := lifecycle.NewHookRegistry(nil)
+		registry := lifecycle.NewHookRegistry()
 		registerable.Register(registry)
 		return registry.ToHooks(), err
 	}

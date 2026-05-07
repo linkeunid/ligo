@@ -7,6 +7,18 @@ import (
 	"time"
 )
 
+const (
+	// MaxThrottleEntries is the maximum number of throttle entries before eviction begins.
+	// This prevents unbounded memory growth in high-traffic scenarios.
+	MaxThrottleEntries = 10000
+	// ThrottleCleanupInterval is how often the throttle store is cleaned up.
+	// Balance between memory usage and cleanup overhead.
+	ThrottleCleanupInterval = 5 * time.Minute
+	// EvictionBufferPercentage is the extra percentage of entries to remove during eviction.
+	// Removing 10% extra avoids frequent eviction cycles.
+	EvictionBufferPercentage = 0.10
+)
+
 // HasRole is an interface that types can implement for role checking.
 type HasRole interface {
 	HasRole(role string) bool
@@ -69,10 +81,6 @@ func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) 
 	}
 }
 
-const (
-	maxThrottleEntries = 10000
-)
-
 var (
 	throttleStore = make(map[string]*throttleEntry)
 	throttleMu    sync.Mutex
@@ -103,7 +111,7 @@ func startThrottleCleanup() {
 	}
 
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(ThrottleCleanupInterval)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -118,7 +126,7 @@ func startThrottleCleanup() {
 				entry.mu.Unlock()
 			}
 			// Enforce maximum entries to prevent unbounded memory growth
-			if len(throttleStore) > maxThrottleEntries {
+			if len(throttleStore) > MaxThrottleEntries {
 				evictOldestEntries()
 			}
 			throttleMu.Unlock()
@@ -126,11 +134,20 @@ func startThrottleCleanup() {
 	}()
 }
 
-// evictOldestEntries removes oldest entries to maintain maxThrottleEntries limit.
+// evictOldestEntries removes oldest entries to maintain MaxThrottleEntries limit.
+//
+// Eviction Strategy:
+// - Uses an eviction buffer (10% of max) to avoid frequent eviction cycles
+// - Removes extra entries beyond the limit to reduce cleanup frequency
+// - Simple map iteration removal (not true LRU, but sufficient for rate limiting)
+//
+// Trade-offs:
+// - True LRU would require tracking last access time per entry (more memory)
+// - Random eviction would be simpler but less predictable
+// - Current approach balances memory overhead with eviction frequency
 func evictOldestEntries() {
-	// Simple LRU-style eviction: remove entries with oldest last activity
-	// We'll remove 10% of entries to avoid frequent evictions
-	toRemove := (len(throttleStore) - maxThrottleEntries) + (maxThrottleEntries / 10)
+	buffer := int(float64(MaxThrottleEntries) * EvictionBufferPercentage)
+	toRemove := (len(throttleStore) - MaxThrottleEntries) + buffer
 	count := 0
 	for key := range throttleStore {
 		if count >= toRemove {

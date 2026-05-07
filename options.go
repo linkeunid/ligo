@@ -9,6 +9,13 @@ import (
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
+const (
+	// DefaultPort is the default HTTP port for the server.
+	DefaultPort = ":8080"
+	// DefaultGracefulTimeout is the default timeout for graceful shutdown.
+	DefaultGracefulTimeout = 10 * time.Second
+)
+
 type options struct {
 	router             Router
 	addr               string
@@ -82,9 +89,9 @@ type Option func(*options)
 
 func defaultOptions() options {
 	return options{
-		addr: ":8080",
-		logger: logger.New(),
-		gracefulTimeout: 10 * time.Second,
+		addr:            DefaultPort,
+		logger:          logger.New(),
+		gracefulTimeout: DefaultGracefulTimeout,
 	}
 }
 
