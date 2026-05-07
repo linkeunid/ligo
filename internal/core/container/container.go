@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -22,11 +23,11 @@ type Container struct {
 
 // ProviderEntry represents a registered provider in the container.
 type ProviderEntry struct {
-	factory   func(args []reflect.Value) (any, error)
-	eager     any
-	argTypes  []reflect.Type
-	transient bool
-	exported  bool
+	factory      func(args []reflect.Value) (any, error)
+	eager        any
+	argTypes     []reflect.Type
+	transient    bool
+	exported     bool
 	hookRegistry any // *lifecycle.HookRegistry for RegisterFrom call after instance creation
 }
 
@@ -106,14 +107,10 @@ func ResolveByType(c *Container, typ reflect.Type) (any, error) {
 }
 
 // resolve resolves a type, tracking the dependency chain for cycle detection.
-// Cycle detection uses chain (per-call), NOT global resolving map.
+// Cycle detection uses chain (per-call), NOT global resolving map.com
 func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error) {
-	for _, t := range chain {
-		if t == typ {
-			return nil, &ErrCircularDependency{
-				Chain: chainToStrings(append(chain, typ)),
-			}
-		}
+	if err := c.checkCircularDependency(typ, chain); err != nil {
+		return nil, err
 	}
 
 	// Fast path: cache hit (handles cached interface aliases too)
@@ -164,6 +161,22 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 		return c.build(typ, entry, chain)
 	}
 
+	return c.resolveSingleton(typ, entry, chain, requestedTyp)
+}
+
+// checkCircularDependency checks if the type would create a circular dependency.
+func (c *Container) checkCircularDependency(typ reflect.Type, chain []reflect.Type) error {
+	if slices.Contains(chain, typ) {
+		return &ErrCircularDependency{
+			Chain: chainToStrings(append(chain, typ)),
+		}
+	}
+	return nil
+}
+
+// resolveSingleton resolves a singleton type with proper locking and caching.
+func (c *Container) resolveSingleton(typ reflect.Type, entry ProviderEntry, chain []reflect.Type, requestedTyp reflect.Type) (any, error) {
+	// Double-check cache after acquiring interface fallback
 	if val, ok := c.cache.Load(typ); ok {
 		return val, nil
 	}
@@ -173,6 +186,7 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 	lock.Lock()
 	defer lock.Unlock()
 
+	// Check cache again after acquiring lock
 	if val, ok := c.cache.Load(typ); ok {
 		return val, nil
 	}

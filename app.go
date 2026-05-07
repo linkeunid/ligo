@@ -11,6 +11,7 @@ import (
 
 	"github.com/linkeunid/ligo/internal/app"
 	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 	"github.com/linkeunid/ligo/internal/http"
@@ -19,13 +20,13 @@ import (
 // App represents a Ligo application with dependency injection, module management,
 // and HTTP server capabilities.
 type App struct {
-	mu           sync.Mutex
-	started      bool
-	modules      []module.Module
-	providers    []Provider
-	container    *container.Container
-	moduleHooks  *app.ModuleHooks
-	opts         options
+	mu          sync.Mutex
+	started     bool
+	modules     []module.Module
+	providers   []Provider
+	container   *container.Container
+	moduleHooks *app.ModuleHooks
+	opts        options
 }
 
 // New creates a new Ligo application with the given options.
@@ -101,16 +102,47 @@ func (a *App) Provide(providers ...Provider) {
 //	    log.Fatal(err)
 //	}
 func (a *App) Run() error {
-	a.mu.Lock()
-	if a.started {
-		a.mu.Unlock()
-		panic(&ErrAppAlreadyStarted{})
+	if err := a.ensureNotStarted(); err != nil {
+		return err
 	}
-	a.started = true
-	a.mu.Unlock()
 
 	a.opts.logger.Info("Starting ligo application", logger.Field{Key: "context", Value: logger.ContextApp})
 
+	root := a.buildContainer()
+	a.container = root
+
+	expandedModules := app.ExpandModules(a.modules)
+	a.initializeModules(root, expandedModules)
+
+	router := a.setupRouter(root)
+	controllerHooks, err := a.bindControllers(root, router, expandedModules)
+	if err != nil {
+		return err
+	}
+	a.moduleHooks.Providers = append(a.moduleHooks.Providers, controllerHooks...)
+
+	if err := a.executeStartupHooks(); err != nil {
+		return err
+	}
+
+	a.opts.logger.Info("Ligo application started", a.getLogFields()...)
+
+	return a.startServer()
+}
+
+// ensureNotStarted checks if the app has already started and panics if so.
+func (a *App) ensureNotStarted() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.started {
+		return &ErrAppAlreadyStarted{}
+	}
+	a.started = true
+	return nil
+}
+
+// buildContainer creates and configures the DI container with all providers.
+func (a *App) buildContainer() *container.Container {
 	root := container.New(a.opts.logger)
 
 	loggerType := reflect.TypeOf((*logger.Logger)(nil)).Elem()
@@ -120,16 +152,19 @@ func (a *App) Run() error {
 		app.RegisterProvider(root, p)
 	}
 
-	expandedModules := app.ExpandModules(a.modules)
+	return root
+}
 
+// initializeModules registers all modules with the container.
+func (a *App) initializeModules(root *container.Container, expandedModules []module.Module) {
 	for _, mod := range expandedModules {
 		app.BuildModule(root, mod, a.moduleHooks)
 		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
 	}
+}
 
-	a.container = root
-
-	// Bind controllers to collect their lifecycle hooks (must happen before hook execution)
+// setupRouter configures the HTTP router with the container and middleware.
+func (a *App) setupRouter(root *container.Container) http.Router {
 	var router http.Router
 	if a.opts.router != nil {
 		router = a.opts.router
@@ -145,52 +180,72 @@ func (a *App) Run() error {
 	} else {
 		router = &http.NullRouter{}
 	}
+	return router
+}
 
-	binder := http.NewBinder(a.container, router, a.opts.logger)
+// bindControllers binds all controllers and collects their lifecycle hooks.
+func (a *App) bindControllers(root *container.Container, router http.Router, expandedModules []module.Module) ([]lifecycle.Hooks, error) {
+	binder := http.NewBinder(root, router, a.opts.logger)
 	controllerHooks, err := binder.BindControllers(expandedModules)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.moduleHooks.Providers = append(a.moduleHooks.Providers, controllerHooks...)
+	return controllerHooks, nil
+}
 
+// executeStartupHooks runs OnStart, OnInit, and OnBootstrap hooks.
+func (a *App) executeStartupHooks() error {
+	// Run custom OnStart hooks
 	for _, hook := range a.opts.onStart {
 		if err := hook(nil); err != nil {
 			return fmt.Errorf("OnStart hook failed: %w", err)
 		}
 	}
 
+	// Run module OnInit hooks
 	if err := app.ExecuteHooks(a.moduleHooks.OnInit, a.opts.logger, "OnModuleInit"); err != nil {
 		return err
 	}
 
-	// Execute provider OnModuleInit hooks
+	// Run provider OnInit hooks
+	if err := a.executeProviderHooks(func(hooks *lifecycle.Hooks) func() error {
+		return hooks.OnInit
+	}); err != nil {
+		return err
+	}
+
+	// Run provider OnBootstrap hooks
+	return a.executeProviderHooks(func(hooks *lifecycle.Hooks) func() error {
+		return hooks.OnBootstrap
+	})
+}
+
+// executeProviderHooks executes a specific hook type across all providers.
+func (a *App) executeProviderHooks(getHook func(*lifecycle.Hooks) func() error) error {
 	for i := range a.moduleHooks.Providers {
-		// Only refresh if registry exists (HookedFactory pattern where RegisterFrom may have been called during resolution)
 		if a.moduleHooks.Providers[i].HasRegistry() {
 			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
 		}
-		if a.moduleHooks.Providers[i].OnInit != nil {
-			if err := a.moduleHooks.Providers[i].OnInit(); err != nil {
-				return fmt.Errorf("OnModuleInit hook failed: %w", err)
+		if hook := getHook(&a.moduleHooks.Providers[i]); hook != nil {
+			if err := hook(); err != nil {
+				return fmt.Errorf("provider hook failed: %w", err)
 			}
 		}
 	}
+	return nil
+}
 
-	// Execute provider OnApplicationBootstrap hooks
-	for i := range a.moduleHooks.Providers {
-		if a.moduleHooks.Providers[i].OnBootstrap != nil {
-			if err := a.moduleHooks.Providers[i].OnBootstrap(); err != nil {
-				return fmt.Errorf("OnApplicationBootstrap hook failed: %w", err)
-			}
-		}
-	}
-
+// getLogFields returns log fields for application startup.
+func (a *App) getLogFields() []logger.Field {
 	fields := []logger.Field{{Key: "context", Value: logger.ContextApp}}
 	if a.opts.router != nil {
 		fields = append(fields, logger.Field{Key: "addr", Value: a.opts.addr})
 	}
-	a.opts.logger.Info("Ligo application started", fields...)
+	return fields
+}
 
+// startServer starts the HTTP server or waits for shutdown signals in non-HTTP mode.
+func (a *App) startServer() error {
 	if a.opts.router != nil {
 		onStop := make([]func(any) error, len(a.opts.onStop))
 		for i, h := range a.opts.onStop {
