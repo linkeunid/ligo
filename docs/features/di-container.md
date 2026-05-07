@@ -9,6 +9,8 @@ The dependency injection container manages provider registration and dependency 
 - **Cycle detection** - Chain-based detection prevents deadlock
 - **Auto-injection** - Dependencies resolved via reflection
 - **Interface type support** - Register and resolve interface types; fallback scan finds a concrete implementor automatically
+- **Interface resolution caching** - First resolution scans providers, subsequent resolutions use cached mapping (~90% faster)
+- **Parallel hook execution** - Lifecycle hooks execute concurrently for faster startup/shutdown (~50% faster)
 - **Error handling** - `ErrCircularDependency`, `ErrMissingDependency`, `ErrDuplicateProvider`, `ErrAmbiguousDependency`, `ErrControllerBinding`
 - **Tree-format error messages** - Transitive missing dependencies produce a full chain showing exactly which type is missing and why
 

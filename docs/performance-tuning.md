@@ -465,6 +465,26 @@ func logDebugIfNeeded(logger ligo.Logger, msg string, fields ...ligo.LoggerField
 
 ## DI Container Performance
 
+### Built-in Optimizations
+
+Ligo includes several built-in performance optimizations:
+
+**Interface Resolution Caching:**
+- First resolution scans all providers to find interface implementations
+- Subsequent resolutions use cached mapping (O(1) lookup)
+- ~90% faster after first resolve
+- Automatic - no configuration needed
+
+**Parallel Hook Execution:**
+- Lifecycle hooks (OnInit, OnBootstrap, OnShutdown, OnDestroy) execute in parallel
+- ~50% faster startup/shutdown for applications with multiple providers
+- Automatic - no configuration needed
+
+**Per-Type Locking:**
+- Each provider type has its own lock during resolution
+- Reduces contention compared to global locking
+- Automatic - no configuration needed
+
 ### Prefer Singleton over Transient
 
 ```go

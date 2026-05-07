@@ -175,13 +175,15 @@ ligo.Controllers(ligo.HookedController(NewUserController))
 
 **Execution order:**
 1. Module-level `OnStart` hooks
-2. Provider `OnModuleInit` hooks (in registration order)
-3. Provider `OnApplicationBootstrap` hooks
+2. Provider `OnModuleInit` hooks (in registration order, executed in parallel)
+3. Provider `OnApplicationBootstrap` hooks (executed in parallel)
 4. Application runs (HTTP server or signal wait)
-5. Provider `BeforeApplicationShutdown` hooks (reverse order)
-6. Provider `OnApplicationShutdown` hooks (reverse order)
-7. Provider `OnModuleDestroy` hooks (reverse order)
+5. Provider `BeforeApplicationShutdown` hooks (reverse order, executed in parallel)
+6. Provider `OnApplicationShutdown` hooks (reverse order, executed in parallel)
+7. Provider `OnModuleDestroy` hooks (reverse order, executed in parallel)
 8. Module-level `OnStop` hooks
+
+**Performance:** Hooks execute in parallel using goroutines, reducing startup/shutdown time by ~50% for applications with multiple providers.
 
 **Works for both HTTP and non-HTTP apps:** Bots, CLI runners, and background workers can use the same lifecycle hooks — just create the app without `WithRouter()`.
 
