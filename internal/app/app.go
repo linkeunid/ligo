@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"syscall"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
@@ -43,7 +43,7 @@ type Provider interface {
 }
 
 // BuildProviderEntry builds a container entry from a provider and returns its lifecycle hooks.
-func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
+func BuildProviderEntry(p Provider) (di.ProviderEntry, lifecycle.Hooks) {
 	// Start with explicit hooks if registered
 	var hooks lifecycle.Hooks
 	if registry := p.Hooks(); registry != nil {
@@ -64,7 +64,7 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 			interfaceHooks := lifecycle.CollectHooks(p.Eager())
 			mergeHooks(&hooks, interfaceHooks)
 		}
-		return container.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported(), nil), hooks
+		return di.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported(), nil), hooks
 	}
 
 	fn := reflect.ValueOf(p).MethodByName("Fn").Call([]reflect.Value{})[0].Interface()
@@ -76,7 +76,7 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 		argTypes[i] = fnType.In(i)
 	}
 
-	entry := container.NewEntry(func(args []reflect.Value) (any, error) {
+	entry := di.NewEntry(func(args []reflect.Value) (any, error) {
 		out := fnValue.Call(args)
 		if len(out) == 0 {
 			return nil, fmt.Errorf("ligo: factory function must return a value")
@@ -88,15 +88,15 @@ func BuildProviderEntry(p Provider) (container.ProviderEntry, lifecycle.Hooks) {
 }
 
 // RegisterProvider registers a provider in the container and returns its lifecycle hooks.
-func RegisterProvider(c *container.Container, p Provider) lifecycle.Hooks {
+func RegisterProvider(c *di.Container, p Provider) lifecycle.Hooks {
 	entry, hooks := BuildProviderEntry(p)
 	c.Register(p.Type(), entry)
 	return hooks
 }
 
-// BuildModule registers providers from a module and its imports in the container.
+// BuildModule registers providers from a module and its imports in the di.
 // The module must have been pre-expanded by ExpandModule — dynamic fields are not processed here.
-func BuildModule(parent *container.Container, mod module.Module, hooks *ModuleHooks) {
+func BuildModule(parent *di.Container, mod module.Module, hooks *ModuleHooks) {
 	modContainer := parent
 
 	// Pre-allocate capacity for provider hooks to reduce slice growth

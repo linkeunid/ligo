@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 type testSvc struct {
@@ -60,7 +60,7 @@ func TestAppRunResolvesModules(t *testing.T) {
 		t.Fatal("expected container to be built after Run()")
 	}
 
-	svc := container.Resolve[*testSvc](app.container)
+	svc := di.Resolve[*testSvc](app.container)
 	if svc.name != "svc" {
 		t.Fatalf("expected 'svc', got %s", svc.name)
 	}
@@ -150,7 +150,7 @@ func TestAppContainerEscapeHatch(t *testing.T) {
 		t.Fatal("expected container escape hatch")
 	}
 
-	svc := container.Resolve[*testSvc](c)
+	svc := di.Resolve[*testSvc](c)
 	if svc.name != "hatch" {
 		// Send shutdown signal before failing
 		process, _ := os.FindProcess(os.Getpid())

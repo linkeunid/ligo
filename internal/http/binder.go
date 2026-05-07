@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
@@ -25,13 +25,13 @@ func unwrapController(fn any) (unwrapped any, isHooked bool) {
 
 // Binder handles controller registration and dependency injection.
 type Binder struct {
-	container *container.Container
+	container *di.Container
 	router    Router
 	logger    logger.Logger
 }
 
 // NewBinder creates a new binder instance.
-func NewBinder(c *container.Container, r Router, log logger.Logger) *Binder {
+func NewBinder(c *di.Container, r Router, log logger.Logger) *Binder {
 	return &Binder{
 		container: c,
 		router:    r,
@@ -120,7 +120,7 @@ func (b *Binder) resolveConstructor(fn any, typeName string, modName string, val
 	// Resolve dependencies
 	args := make([]reflect.Value, len(argTypes))
 	for i, argType := range argTypes {
-		resolved, err := container.ResolveByType(b.container, argType)
+		resolved, err := di.ResolveByType(b.container, argType)
 		if err != nil {
 			return nil, &ErrControllerBinding{
 				Module:     modName,
@@ -210,7 +210,7 @@ func (e *ErrControllerBinding) Unwrap() error { return e.Cause }
 // dep is the type that failed; requiredBy is its direct consumer.
 func writeChain(b *strings.Builder, dep, requiredBy string, cause error, indent string) {
 	fmt.Fprintf(b, "%s%s  <- required by %s\n", indent, dep, requiredBy)
-	var next *container.ErrMissingDependency
+	var next *di.ErrMissingDependency
 	if errors.As(cause, &next) {
 		writeChain(b, next.Type, dep, next.Cause, indent+"  ")
 	} else if chainable, ok := cause.(*errutil.ChainableError); ok {

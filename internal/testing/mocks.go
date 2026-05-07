@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
@@ -13,7 +13,7 @@ type MockContext struct {
 	values    map[string]any
 	req       *http.Request
 	resp      http.ResponseWriter
-	reqCont   *container.Container
+	reqCont   *di.Container
 }
 
 // NewMockContext creates a new mock context for testing.
@@ -65,13 +65,13 @@ func (m *MockContext) Get(key string) any {
 	return m.values[key]
 }
 
-// SetRequestContainer sets the request-scoped DI container.
-func (m *MockContext) SetRequestContainer(c *container.Container) {
+// SetRequestContainer sets the request-scoped DI di.
+func (m *MockContext) SetRequestContainer(c *di.Container) {
 	m.reqCont = c
 }
 
-// GetRequestContainer returns the request-scoped DI container.
-func (m *MockContext) GetRequestContainer() *container.Container {
+// GetRequestContainer returns the request-scoped DI di.
+func (m *MockContext) GetRequestContainer() *di.Container {
 	return m.reqCont
 }
 

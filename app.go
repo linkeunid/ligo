@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/linkeunid/ligo/internal/app"
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
@@ -24,7 +24,7 @@ type App struct {
 	started     bool
 	modules     []module.Module
 	providers   []Provider
-	container   *container.Container
+	container   *di.Container
 	moduleHooks *app.ModuleHooks
 	opts        options
 }
@@ -148,11 +148,11 @@ func (a *App) ensureNotStarted() error {
 }
 
 // buildContainer creates and configures the DI container with all providers.
-func (a *App) buildContainer() *container.Container {
-	root := container.New(a.opts.logger)
+func (a *App) buildContainer() *di.Container {
+	root := di.New(a.opts.logger)
 
 	loggerType := reflect.TypeFor[logger.Logger]()
-	root.Register(loggerType, container.NewEntry(nil, a.opts.logger, nil, false, true, nil))
+	root.Register(loggerType, di.NewEntry(nil, a.opts.logger, nil, false, true, nil))
 
 	for _, p := range a.providers {
 		app.RegisterProvider(root, p)
@@ -161,8 +161,8 @@ func (a *App) buildContainer() *container.Container {
 	return root
 }
 
-// initializeModules registers all modules with the container.
-func (a *App) initializeModules(root *container.Container, expandedModules []module.Module) {
+// initializeModules registers all modules with the di.
+func (a *App) initializeModules(root *di.Container, expandedModules []module.Module) {
 	for _, mod := range expandedModules {
 		app.BuildModule(root, mod, a.moduleHooks)
 		a.opts.logger.LogWithContext(logger.ContextDIContainer, fmt.Sprintf("%s module initialized", mod.Name))
@@ -170,7 +170,7 @@ func (a *App) initializeModules(root *container.Container, expandedModules []mod
 }
 
 // setupRouter configures the HTTP router with the container and middleware.
-func (a *App) setupRouter(root *container.Container) http.Router {
+func (a *App) setupRouter(root *di.Container) http.Router {
 	var router http.Router
 	if a.opts.router != nil {
 		router = a.opts.router
@@ -190,7 +190,7 @@ func (a *App) setupRouter(root *container.Container) http.Router {
 }
 
 // bindControllers binds all controllers and collects their lifecycle hooks.
-func (a *App) bindControllers(root *container.Container, router http.Router, expandedModules []module.Module) ([]lifecycle.Hooks, error) {
+func (a *App) bindControllers(root *di.Container, router http.Router, expandedModules []module.Module) ([]lifecycle.Hooks, error) {
 	binder := http.NewBinder(root, router, a.opts.logger)
 	controllerHooks, err := binder.BindControllers(expandedModules)
 	if err != nil {
@@ -350,7 +350,7 @@ func (a *App) shutdown() error {
 	return nil
 }
 
-func (a *App) Container() *container.Container {
+func (a *App) Container() *di.Container {
 	if a.container == nil {
 		panic("ligo: cannot access container before Run()")
 	}

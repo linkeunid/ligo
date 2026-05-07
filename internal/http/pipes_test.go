@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 type mockBindContext struct {
@@ -59,8 +59,8 @@ func (mockContextBase) Header(_ string) string                   { return "" }
 func (mockContextBase) Stream(_ any) error                       { return nil }
 func (mockContextBase) Request() *nethttp.Request                           { return nil }
 func (mockContextBase) Response() nethttp.ResponseWriter                    { return nil }
-func (mockContextBase) SetRequestContainer(_ *container.Container)          {}
-func (mockContextBase) GetRequestContainer() *container.Container           { return nil }
+func (mockContextBase) SetRequestContainer(_ *di.Container)          {}
+func (mockContextBase) GetRequestContainer() *di.Container           { return nil }
 
 type testInput struct {
 	Name string

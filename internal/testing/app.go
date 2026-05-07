@@ -2,7 +2,7 @@ package testing
 
 import (
 	"github.com/linkeunid/ligo"
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 // NewTestApp creates an app with the given modules, runs it, and returns it.
@@ -15,8 +15,8 @@ func NewTestApp(modules ...ligo.Module) *ligo.App {
 }
 
 // NewTestContainer creates a fresh container for unit testing.
-func NewTestContainer() *container.Container {
-	return container.New()
+func NewTestContainer() *di.Container {
+	return di.New()
 }
 
 // NewTestAppWithOverrides creates an app with the given modules and overrides.

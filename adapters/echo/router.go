@@ -13,7 +13,7 @@ import (
 
 	echo "github.com/labstack/echo/v5"
 	httpifc "github.com/linkeunid/ligo/internal/http"
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	app "github.com/linkeunid/ligo/internal/app"
 )
@@ -26,7 +26,7 @@ type Adapter struct {
 	middleware []httpifc.Middleware
 	logger     logger.Logger
 	server     *http.Server
-	container  *container.Container
+	container  *di.Container
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -40,7 +40,7 @@ func NewAdapter() *Adapter {
 }
 
 // SetContainer sets the root DI container for request-scoped DI.
-func (a *Adapter) SetContainer(c *container.Container) {
+func (a *Adapter) SetContainer(c *di.Container) {
 	a.container = c
 	// Add request scope middleware if container is set
 	if c != nil {
@@ -162,7 +162,7 @@ func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.
 type contextAdapter struct {
 	c         *echo.Context
 	values    map[string]any
-	reqCont   *container.Container
+	reqCont   *di.Container
 }
 
 var contextPool = sync.Pool{
@@ -216,11 +216,11 @@ func (ca *contextAdapter) Get(key string) any {
 	return ca.values[key]
 }
 
-func (ca *contextAdapter) SetRequestContainer(c *container.Container) {
+func (ca *contextAdapter) SetRequestContainer(c *di.Container) {
 	ca.reqCont = c
 }
 
-func (ca *contextAdapter) GetRequestContainer() *container.Container {
+func (ca *contextAdapter) GetRequestContainer() *di.Container {
 	return ca.reqCont
 }
 

@@ -1,7 +1,7 @@
 package ligo
 
 // Package ligo provides dependency injection providers for registering
-// values, factories, and transient services in the DI container.
+// values, factories, and transient services in the DI di.
 
 import (
 	"reflect"
@@ -10,7 +10,7 @@ import (
 )
 
 // Provider represents a dependency provider that can be registered
-// in the DI container. Providers can be eager values or factory functions.
+// in the DI di. Providers can be eager values or factory functions.
 type Provider struct {
 	typ       reflect.Type
 	fn        any // raw factory function

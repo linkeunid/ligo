@@ -3,7 +3,7 @@ package http
 import (
 	"context"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
 )
 
@@ -66,7 +66,7 @@ type SetLoggerRouter interface {
 // SetContainerRouter extends Router with DI container support for request-scoped DI.
 type SetContainerRouter interface {
 	Router
-	SetContainer(*container.Container)
+	SetContainer(*di.Container)
 }
 
 // GracefulServer extends Router with graceful shutdown capability.

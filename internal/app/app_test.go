@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
@@ -53,7 +53,7 @@ func TestBuildProviderEntry(t *testing.T) {
 		entry, _ := BuildProviderEntry(p)
 
 		// Entry should be valid for container registration
-		c := container.New()
+		c := di.New()
 		c.Register(reflect.TypeOf("string"), entry)
 
 		types := c.Types()
@@ -67,7 +67,7 @@ func TestBuildProviderEntry(t *testing.T) {
 		entry, _ := BuildProviderEntry(p)
 
 		// Entry should be valid for container registration
-		c := container.New()
+		c := di.New()
 		c.Register(reflect.TypeOf("string"), entry)
 
 		types := c.Types()
@@ -80,13 +80,13 @@ func TestBuildProviderEntry(t *testing.T) {
 		p := &mockProvider{isTransient: true, eager: "test"}
 		entry, _ := BuildProviderEntry(p)
 
-		c := container.New()
+		c := di.New()
 		typ := reflect.TypeOf("string")
 		c.Register(typ, entry)
 
 		// Resolve twice - transient should create new instances
-		v1, _ := container.ResolveByType(c, typ)
-		v2, _ := container.ResolveByType(c, typ)
+		v1, _ := di.ResolveByType(c, typ)
+		v2, _ := di.ResolveByType(c, typ)
 
 		// For eager providers, same value is returned even with transient
 		// The flag is preserved in the entry structure
@@ -103,7 +103,7 @@ func TestBuildProviderEntry(t *testing.T) {
 
 func TestRegisterProvider(t *testing.T) {
 	t.Run("register eager provider", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		p := &mockProvider{
 			typ:   reflect.TypeOf("string"),
 			eager: "test",
@@ -117,7 +117,7 @@ func TestRegisterProvider(t *testing.T) {
 		}
 
 		// Verify we can resolve the value
-		val, err := container.ResolveByType(c, reflect.TypeOf("string"))
+		val, err := di.ResolveByType(c, reflect.TypeOf("string"))
 		if err != nil {
 			t.Fatalf("ResolveByType() error = %v", err)
 		}
@@ -127,7 +127,7 @@ func TestRegisterProvider(t *testing.T) {
 	})
 
 	t.Run("register factory provider", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		p := &mockProvider{
 			typ: reflect.TypeOf("string"),
 		}
@@ -143,7 +143,7 @@ func TestRegisterProvider(t *testing.T) {
 
 func TestBuildModule(t *testing.T) {
 	t.Run("simple module with providers", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		m := module.New("test",
 			module.Providers(&mockProvider{eager: "provider1"}),
 		)
@@ -158,7 +158,7 @@ func TestBuildModule(t *testing.T) {
 	})
 
 	t.Run("module with init hook", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		m := module.New("test",
 			module.OnModuleInit(func() error {
 				return nil
@@ -177,7 +177,7 @@ func TestBuildModule(t *testing.T) {
 	})
 
 	t.Run("module with destroy hook", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		m := module.New("test",
 			module.OnModuleDestroy(func() error {
 				return nil
@@ -193,7 +193,7 @@ func TestBuildModule(t *testing.T) {
 	})
 
 	t.Run("module with imported modules", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		imported := module.New("imported",
 			module.Providers(&mockProvider{eager: "imported-provider"}),
 		)
@@ -213,7 +213,7 @@ func TestBuildModule(t *testing.T) {
 	t.Run("dynamic module providers are registered when pre-expanded", func(t *testing.T) {
 		// After wiring, BuildModule receives already-expanded modules.
 		// Simulate by calling ExpandModule first, then BuildModule.
-		c := container.New()
+		c := di.New()
 
 		dynamicFactory := func(opts ...any) module.Module {
 			return module.New("dynamic",
@@ -238,7 +238,7 @@ func TestBuildModule(t *testing.T) {
 	})
 
 	t.Run("exported vs non-exported providers", func(t *testing.T) {
-		parent := container.New()
+		parent := di.New()
 		child := parent.NewChild()
 
 		type ExportedType struct{}
@@ -531,7 +531,7 @@ func TestExpandModules(t *testing.T) {
 
 func TestExplicitHooks(t *testing.T) {
 	t.Run("module with explicit hooks registry", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		registry := lifecycle.NewModuleHookRegistry()
 		registry.OnInit(func() error {
 			return nil
@@ -556,7 +556,7 @@ func TestExplicitHooks(t *testing.T) {
 	})
 
 	t.Run("module with both explicit and functional hooks", func(t *testing.T) {
-		c := container.New()
+		c := di.New()
 		registry := lifecycle.NewModuleHookRegistry()
 		registry.OnInit(func() error {
 			return nil

@@ -3,7 +3,7 @@ package http
 import (
 	"net/http"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 // Controller defines how HTTP routes are registered for a module.
@@ -31,8 +31,8 @@ type Context interface {
 	Get(key string) any
 
 	// Request-scoped DI container
-	SetRequestContainer(c *container.Container)
-	GetRequestContainer() *container.Container
+	SetRequestContainer(c *di.Container)
+	GetRequestContainer() *di.Container
 
 	// HTTP response helpers
 	OK(v any) error

@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/core/container"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
 )
@@ -50,7 +50,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		)
 
 		router := &mockRouter{}
-		c := container.New()
+		c := di.New()
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
@@ -83,7 +83,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		)
 
 		router := &mockRouter{}
-		c := container.New()
+		c := di.New()
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
@@ -111,7 +111,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 		)
 
 		router := &mockRouter{}
-		c := container.New()
+		c := di.New()
 		log := logger.New()
 		binder := NewBinder(c, router, log)
 
@@ -129,7 +129,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 type myBinderService struct{}
 
 func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
-	c := container.New()
+	c := di.New()
 	// Do NOT register myBinderService — binder should return ErrControllerBinding
 
 	mod := module.New("user",
