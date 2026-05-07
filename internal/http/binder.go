@@ -10,6 +10,7 @@ import (
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	errutil "github.com/linkeunid/ligo/internal/errors"
 )
 
 // unwrapController extracts the underlying constructor and whether it was wrapped.
@@ -212,6 +213,8 @@ func writeChain(b *strings.Builder, dep, requiredBy string, cause error, indent 
 	var next *container.ErrMissingDependency
 	if errors.As(cause, &next) {
 		writeChain(b, next.Type, dep, next.Cause, indent+"  ")
+	} else if chainable, ok := cause.(*errutil.ChainableError); ok {
+		b.WriteString(errutil.FormatChain(chainable.Type, chainable.RequiredBy, chainable.Cause, indent))
 	} else if cause != nil {
 		fmt.Fprintf(b, "%s  %s", indent, cause.Error())
 	} else {

@@ -51,6 +51,9 @@ func RolesGuard(contextKey string, requiredRoles ...string) Guard {
 // ThrottleGuard creates a rate-limiting guard using a simple in-memory counter.
 // Usage: Guard(ThrottleGuard("ip", 10, time.Minute))
 func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) Guard {
+	// Initialize cleanup goroutine on first use
+	startThrottleCleanup()
+
 	return func(ctx Context) (bool, error) {
 		identifier := ctx.Get(identifierKey)
 		if identifier == nil {
@@ -160,6 +163,5 @@ func evictOldestEntries() {
 
 // AdminGuard is a convenience guard that checks for admin role.
 func AdminGuard(contextKey string) Guard {
-	startThrottleCleanup()
 	return RolesGuard(contextKey, "admin")
 }

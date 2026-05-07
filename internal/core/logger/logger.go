@@ -3,7 +3,8 @@ package logger
 import (
 	"log/slog"
 	"os"
-	"reflect"
+
+	reflectutil "github.com/linkeunid/ligo/internal/reflect"
 )
 
 // Context represents the internal component that generated the log.
@@ -147,25 +148,7 @@ func fieldsToSlogArgs(fields []Field) []any {
 }
 
 // ExtractProviderName extracts a clean name from a provider type or factory function.
+// Deprecated: Use reflectutil.ExtractTypeName instead for better consistency.
 func ExtractProviderName(fn any) string {
-	if fn == nil {
-		return "unknown"
-	}
-
-	typ := reflect.TypeOf(fn)
-	if typ.Kind() == reflect.Func {
-		if typ.NumOut() > 0 {
-			retType := typ.Out(0)
-			if retType.Kind() == reflect.Ptr {
-				retType = retType.Elem()
-			}
-			return retType.Name()
-		}
-		return typ.Name()
-	}
-
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-	}
-	return typ.Name()
+	return reflectutil.ExtractTypeName(fn)
 }

@@ -113,17 +113,42 @@ func validateExhaustive(v *validator.Validate, s any) error {
 	if !errors.As(err1, &ve1) {
 		return err1
 	}
+
 	seen := make(map[string]struct{}, len(ve1))
+	hasRequired := collectValidationErrors(ve1, seen)
+
+	if !hasRequired {
+		return ve1
+	}
+
+	cpy := createStructCopy(s)
+	combined := append(validator.ValidationErrors(nil), ve1...)
+
+	if err2 := v.Struct(cpy.Addr().Interface()); err2 != nil {
+		var ve2 validator.ValidationErrors
+		if !errors.As(err2, &ve2) {
+			return combined
+		}
+		combined = combineValidationResults(ve2, seen, combined)
+	}
+	return combined
+}
+
+// collectValidationErrors collects validation errors and checks for required field errors.
+func collectValidationErrors(ve validator.ValidationErrors, seen map[string]struct{}) bool {
 	hasRequired := false
-	for _, fe := range ve1 {
+	for _, fe := range ve {
 		seen[fe.Field()+"|"+fe.Tag()] = struct{}{}
 		if fe.Tag() == tagRequired {
 			hasRequired = true
 		}
 	}
-	if !hasRequired {
-		return ve1
-	}
+	return hasRequired
+}
+
+// createStructCopy creates a modified copy of the struct for second-pass validation.
+// Empty strings are replaced with "x" to pass required validation.
+func createStructCopy(s any) reflect.Value {
 	rv := reflect.ValueOf(s)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -140,24 +165,22 @@ func validateExhaustive(v *validator.Validate, s any) error {
 			dst.SetString("x")
 		}
 	}
-	combined := append(validator.ValidationErrors(nil), ve1...)
-	if err2 := v.Struct(cpy.Addr().Interface()); err2 != nil {
-		var ve2 validator.ValidationErrors
-		if !errors.As(err2, &ve2) {
-			return combined
+	return cpy
+}
+
+// combineValidationResults merges second-pass validation errors with first-pass results.
+func combineValidationResults(ve2 validator.ValidationErrors, seen map[string]struct{}, combined validator.ValidationErrors) validator.ValidationErrors {
+	for _, fe := range ve2 {
+		tag, field := fe.Tag(), fe.Field()
+		if tag == tagRequired {
+			continue
 		}
-		for _, fe := range ve2 {
-			tag, field := fe.Tag(), fe.Field()
-			if tag == tagRequired {
-				continue
-			}
-			key := field + "|" + tag
-			if _, dup := seen[key]; dup {
-				continue
-			}
-			combined = append(combined, fe)
-			seen[key] = struct{}{}
+		key := field + "|" + tag
+		if _, dup := seen[key]; dup {
+			continue
 		}
+		combined = append(combined, fe)
+		seen[key] = struct{}{}
 	}
 	return combined
 }
