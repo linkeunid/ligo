@@ -62,20 +62,31 @@ func NewPageResponse(items any, page, perPage int, total int64) PageResponse {
 	}
 }
 
-// ListQuery captures common pagination query params.
+// ListQuery captures common pagination query params. PerPageSet records
+// whether ?per_page= was present in the request, so Normalize can distinguish
+// "absent" (apply default) from "explicitly 0" (honor as LIMIT 0).
 type ListQuery struct {
-	Page    int
-	PerPage int
+	Page       int
+	PerPage    int
+	PerPageSet bool
 }
 
-// Normalize clamps the query into a safe range. perPage falls back to
-// defaultPerPage when unset and is capped at maxPerPage when maxPerPage > 0.
+// Normalize clamps the query into a safe range:
+//
+//   - Page < 1 → 1.
+//   - PerPage falls back to defaultPerPage only when ?per_page= was absent
+//     (PerPageSet == false). An explicit ?per_page=0 stays 0.
+//   - PerPage is clamped to [0, maxPerPage] when maxPerPage > 0; negatives
+//     become 0.
 func (q *ListQuery) Normalize(defaultPerPage, maxPerPage int) {
 	if q.Page < 1 {
 		q.Page = 1
 	}
-	if q.PerPage < 1 {
+	if !q.PerPageSet {
 		q.PerPage = defaultPerPage
+	}
+	if q.PerPage < 0 {
+		q.PerPage = 0
 	}
 	if maxPerPage > 0 && q.PerPage > maxPerPage {
 		q.PerPage = maxPerPage
@@ -95,8 +106,16 @@ func ParseListQuery(r *nethttp.Request) ListQuery {
 	}
 	qs := r.URL.Query()
 	page, _ := strconv.Atoi(qs.Get("page"))
-	perPage, _ := strconv.Atoi(qs.Get("per_page"))
-	return ListQuery{Page: page, PerPage: perPage}
+	raw, ok := qs["per_page"]
+	perPage := 0
+	set := false
+	if ok && len(raw) > 0 && raw[0] != "" {
+		if n, err := strconv.Atoi(raw[0]); err == nil {
+			perPage = n
+			set = true
+		}
+	}
+	return ListQuery{Page: page, PerPage: perPage, PerPageSet: set}
 }
 
 func safeSlice(v any) any {

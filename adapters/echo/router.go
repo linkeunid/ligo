@@ -196,6 +196,28 @@ func (ca *contextAdapter) Param(key string) string {
 	return ca.c.Param(key)
 }
 
+func (ca *contextAdapter) Query(key string) string {
+	return httpifc.Query(ca.c.Request(), key)
+}
+
+func (ca *contextAdapter) QueryDefault(key, def string) string {
+	return httpifc.QueryDefault(ca.c.Request(), key, def)
+}
+
+func (ca *contextAdapter) QueryInt(key string, def int) int {
+	return httpifc.QueryInt(ca.c.Request(), key, def)
+}
+
+func (ca *contextAdapter) BindQuery(v any) error {
+	return httpifc.BindQuery(ca.c.Request(), v)
+}
+
+func (ca *contextAdapter) Paginate(defaultPerPage, maxPerPage int) httpifc.ListQuery {
+	q := httpifc.ParseListQuery(ca.c.Request())
+	q.Normalize(defaultPerPage, maxPerPage)
+	return q
+}
+
 func (ca *contextAdapter) Bind(v any) error {
 	return ca.c.Bind(v)
 }

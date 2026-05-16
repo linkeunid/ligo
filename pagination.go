@@ -47,3 +47,12 @@ func NewPageResponse(items any, page, perPage int, total int64) PageResponse {
 func ParseListQuery(r *nethttp.Request) ListQuery {
 	return http.ParseListQuery(r)
 }
+
+// Paginate is a one-shot helper: ParseListQuery + Normalize. Honors
+// ?per_page=0 (LIMIT 0); falls back to defaultPerPage only when ?per_page=
+// is absent. Caps PerPage at maxPerPage when maxPerPage > 0.
+func Paginate(r *nethttp.Request, defaultPerPage, maxPerPage int) ListQuery {
+	q := http.ParseListQuery(r)
+	q.Normalize(defaultPerPage, maxPerPage)
+	return q
+}

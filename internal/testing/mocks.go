@@ -3,9 +3,11 @@ package testing
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 
 	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
+	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
 // MockContext is a mock implementation of ligo.Context for testing.
@@ -38,6 +40,51 @@ func (m *MockContext) Response() http.ResponseWriter {
 // Param returns a mock path parameter (always empty string).
 func (m *MockContext) Param(key string) string {
 	return ""
+}
+
+// Query delegates to the mock request's URL.Query.
+func (m *MockContext) Query(key string) string {
+	if m.req == nil {
+		return ""
+	}
+	return m.req.URL.Query().Get(key)
+}
+
+// QueryDefault delegates to the mock request's URL.Query with a fallback.
+func (m *MockContext) QueryDefault(key, def string) string {
+	if v := m.Query(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// QueryInt parses a query value as int with a fallback default.
+func (m *MockContext) QueryInt(key string, def int) int {
+	v := m.Query(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+// BindQuery is a no-op mock — tests should populate the target struct manually.
+func (m *MockContext) BindQuery(v any) error {
+	return nil
+}
+
+// Paginate returns a zero-value ListQuery; tests can swap the request to
+// drive realistic pagination behavior.
+func (m *MockContext) Paginate(defaultPerPage, maxPerPage int) httpifc.ListQuery {
+	if m.req == nil {
+		return httpifc.ListQuery{}
+	}
+	q := httpifc.ParseListQuery(m.req)
+	q.Normalize(defaultPerPage, maxPerPage)
+	return q
 }
 
 // Bind is a mock implementation that always returns nil.

@@ -22,6 +22,19 @@ type Context interface {
 	Request() *http.Request
 	Response() http.ResponseWriter
 	Param(key string) string
+	// Query returns a single query-string value or "" when absent.
+	Query(key string) string
+	// QueryDefault returns the query value or def when absent/empty.
+	QueryDefault(key, def string) string
+	// QueryInt parses a query value as int, returning def on missing/invalid.
+	QueryInt(key string, def int) int
+	// BindQuery decodes query parameters into v (struct pointer) using
+	// `query:"name"` field tags. See ligo.BindQuery for supported types.
+	BindQuery(v any) error
+	// Paginate reads ?page= and ?per_page= and applies the normalization
+	// rules of ListQuery.Normalize (page<1→1; per_page absent→default;
+	// per_page<0→0; capped at max). per_page=0 is honored as LIMIT 0.
+	Paginate(defaultPerPage, maxPerPage int) ListQuery
 	Bind(v any) error
 	JSON(code int, v any) error
 	String(code int, s string) error

@@ -28,6 +28,11 @@ func (m *mockBindContext) Get(key string) any      { return m.store[key] }
 type mockContextBase struct{}
 
 func (mockContextBase) Param(_ string) string                    { return "" }
+func (mockContextBase) Query(_ string) string                    { return "" }
+func (mockContextBase) QueryDefault(_, def string) string        { return def }
+func (mockContextBase) QueryInt(_ string, def int) int           { return def }
+func (mockContextBase) BindQuery(_ any) error                    { return nil }
+func (mockContextBase) Paginate(_, _ int) ListQuery              { return ListQuery{} }
 func (mockContextBase) JSON(_ int, _ any) error                  { return nil }
 func (mockContextBase) String(_ int, _ string) error             { return nil }
 func (mockContextBase) OK(_ any) error                           { return nil }
