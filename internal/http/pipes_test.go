@@ -34,6 +34,8 @@ func (mockContextBase) OK(_ any) error                           { return nil }
 func (mockContextBase) Created(_ any) error                      { return nil }
 func (mockContextBase) Accepted(_ any) error                     { return nil }
 func (mockContextBase) NoContent() error                         { return nil }
+func (mockContextBase) List(_ any) error                         { return nil }
+func (mockContextBase) Paginated(_ any, _, _ int, _ int64) error { return nil }
 func (mockContextBase) BadRequest(_ ...string) error                { return nil }
 func (mockContextBase) Unauthorized(_ ...string) error              { return nil }
 func (mockContextBase) Forbidden(_ ...string) error                 { return nil }

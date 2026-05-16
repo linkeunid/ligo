@@ -39,6 +39,12 @@ type Context interface {
 	Created(v any) error
 	Accepted(v any) error
 	NoContent() error
+	// List writes 200 with a { "data": [...], "meta": { "count": N } } envelope.
+	// A nil or typed-nil slice is coerced to [] so the body never renders null.
+	List(items any) error
+	// Paginated writes 200 with a { "data": [...], "meta": { page, per_page,
+	// total, total_pages } } envelope. Items follow the same nil rule as List.
+	Paginated(items any, page, perPage int, total int64) error
 	BadRequest(msg ...string) error
 	Unauthorized(msg ...string) error
 	Forbidden(msg ...string) error

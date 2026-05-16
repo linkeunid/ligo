@@ -250,6 +250,14 @@ func (ca *contextAdapter) NoContent() error {
 	return ca.c.String(http.StatusNoContent, "")
 }
 
+func (ca *contextAdapter) List(items any) error {
+	return ca.c.JSON(http.StatusOK, httpifc.NewListResponse(items))
+}
+
+func (ca *contextAdapter) Paginated(items any, page, perPage int, total int64) error {
+	return ca.c.JSON(http.StatusOK, httpifc.NewPageResponse(items, page, perPage, total))
+}
+
 func (ca *contextAdapter) BadRequest(msg ...string) error {
 	return ca.errorResponse(http.StatusBadRequest, msg...)
 }

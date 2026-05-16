@@ -81,6 +81,8 @@ func (m *MockContext) OK(v any) error                         { return nil }
 func (m *MockContext) Created(v any) error                    { return nil }
 func (m *MockContext) Accepted(v any) error                   { return nil }
 func (m *MockContext) NoContent() error                       { return nil }
+func (m *MockContext) List(items any) error                                   { return nil }
+func (m *MockContext) Paginated(items any, page, perPage int, total int64) error { return nil }
 func (m *MockContext) BadRequest(msg ...string) error         { return nil }
 func (m *MockContext) Unauthorized(msg ...string) error       { return nil }
 func (m *MockContext) Forbidden(msg ...string) error          { return nil }
