@@ -246,9 +246,31 @@ func (a *App) executeStartupHooks() error {
 }
 
 // executeProviderHooks executes a specific hook type across all providers.
-// Hooks that are independent are executed in parallel for better performance.
+// Sequential in registration order by default; parallel when the app opted in
+// via WithParallelHooks().
 func (a *App) executeProviderHooks(getHook func(*lifecycle.Hooks) func() error) error {
-	return executeProviderHooksParallel(a.moduleHooks.Providers, getHook)
+	if a.opts.parallelHooks {
+		return executeProviderHooksParallel(a.moduleHooks.Providers, getHook)
+	}
+	return executeProviderHooksSequential(a.moduleHooks.Providers, getHook)
+}
+
+// executeProviderHooksSequential runs each provider hook in registration order.
+// Stops at the first error and returns it (with provider context).
+func executeProviderHooksSequential(providers []lifecycle.Hooks, getHook func(*lifecycle.Hooks) func() error) error {
+	for i := range providers {
+		if providers[i].HasRegistry() {
+			providers[i] = providers[i].Refresh()
+		}
+		hook := getHook(&providers[i])
+		if hook == nil {
+			continue
+		}
+		if err := hook(); err != nil {
+			return fmt.Errorf("provider hook failed: %w", err)
+		}
+	}
+	return nil
 }
 
 // executeProviderHooksParallel executes provider hooks in parallel where possible.
@@ -375,4 +397,24 @@ func (a *App) Container() *di.Container {
 		panic("ligo: cannot access container before Run()")
 	}
 	return c
+}
+
+// Resolve returns an instance of type T from the application container.
+// Returns the zero value and an error when the type cannot be resolved
+// (missing provider, ambiguous interface, circular dependency, factory error).
+// Must be called after Run() has built the container.
+//
+// Example:
+//
+//	user, err := ligo.Resolve[*UserService](app)
+//	if err != nil { /* handle */ }
+func Resolve[T any](a *App) (T, error) {
+	return di.Resolve[T](a.Container())
+}
+
+// MustResolve returns an instance of type T from the application container.
+// Panics on any resolution failure. Use Resolve when you can handle the error.
+// Must be called after Run() has built the container.
+func MustResolve[T any](a *App) T {
+	return di.MustResolve[T](a.Container())
 }

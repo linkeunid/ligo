@@ -121,7 +121,7 @@ NestJS uses TypeScript decorators. Ligo uses Go-idiomatic equivalents:
 
 ```
 Available now:
-github.com/linkeunid/ligo            ← Core framework (v0.9.6) ✅
+github.com/linkeunid/ligo            ← Core framework (v0.10.0) ✅
 github.com/linkeunid/ligo-cli        ← CLI scaffolding tool ✅
 github.com/linkeunid/ligo-boilerplate← Starter project ✅
 github.com/linkeunid/ligo-memory     ← In-memory store (dev/testing) ✅

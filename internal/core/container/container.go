@@ -90,15 +90,29 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 }
 
 // Resolve returns an instance of type T from the di.
-func Resolve[T any](c *Container) T {
+// Returns the zero value and an error when the type cannot be resolved.
+// Use MustResolve for cases where a resolution failure should panic.
+func Resolve[T any](c *Container) (T, error) {
+	var zero T
 	typ := reflect.TypeFor[T]()
 
 	instance, err := c.resolve(typ, nil)
 	if err != nil {
-		panic(err)
+		return zero, err
 	}
 
-	return instance.(T)
+	return instance.(T), nil
+}
+
+// MustResolve returns an instance of type T from the di.
+// Panics when the type cannot be resolved. Prefer Resolve when callers
+// can handle the error.
+func MustResolve[T any](c *Container) T {
+	v, err := Resolve[T](c)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // ResolveByType returns an instance of the specified type from the di.

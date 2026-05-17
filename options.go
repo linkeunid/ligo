@@ -27,6 +27,7 @@ type options struct {
 	onStart          []LifecycleHook
 	onStop           []LifecycleHook
 	autoPort         bool
+	parallelHooks    bool
 }
 
 // Logger is the interface for framework logging.
@@ -164,5 +165,18 @@ func WithGracefulShutdown(timeout time.Duration) Option {
 func WithAutoPort() Option {
 	return func(o *options) {
 		o.autoPort = true
+	}
+}
+
+// WithParallelHooks runs provider OnInit and OnBootstrap hooks concurrently.
+// Default is sequential execution in registration order — opt in only when
+// the application has many independent providers whose startup work is
+// I/O-bound (DB pools, remote handshakes) and order does not matter.
+//
+// Parallel execution does not guarantee any ordering between hooks and
+// surfaces a single aggregated error if any hook fails.
+func WithParallelHooks() Option {
+	return func(o *options) {
+		o.parallelHooks = true
 	}
 }

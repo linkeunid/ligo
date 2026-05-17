@@ -62,7 +62,7 @@ func TestAppRunResolvesModules(t *testing.T) {
 		t.Fatal("expected container to be built after Run()")
 	}
 
-	svc := di.Resolve[*testSvc](container)
+	svc := di.MustResolve[*testSvc](container)
 	if svc.name != "svc" {
 		t.Fatalf("expected 'svc', got %s", svc.name)
 	}
@@ -153,7 +153,7 @@ func TestAppContainerEscapeHatch(t *testing.T) {
 		t.Fatal("expected container escape hatch")
 	}
 
-	svc := di.Resolve[*testSvc](c)
+	svc := di.MustResolve[*testSvc](c)
 	if svc.name != "hatch" {
 		// Send shutdown signal before failing
 		process, _ := os.FindProcess(os.Getpid())

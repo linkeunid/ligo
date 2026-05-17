@@ -154,6 +154,8 @@ Node-20 removal.
 - Logger auto-registers as provider; injectable without explicit registration
 - No hardcoded string keys or `fmt.Printf` in core code — use structured logging
 - Interface type support: `Factory[MyInterface](fn)` registers under interface type; container scans for concrete implementor
+- Provider `OnInit` and `OnBootstrap` hooks run **sequentially** in registration order by default (since v0.10.0). Opt into the legacy parallel execution with `ligo.WithParallelHooks()` — only do this for many independent I/O-bound providers where ordering does not matter
+- `Resolve[T]` (both `di.Resolve` and the new `ligo.Resolve`) returns `(T, error)`. Use `MustResolve[T]` when a failure should crash the process; never panic from library code that has a non-fatal recovery path
 
 ## Dev Cycle
 

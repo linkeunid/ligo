@@ -4,10 +4,10 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-211%20passing-brightgreen)](https://github.com/linkeunid/ligo)
-[![Coverage](https://img.shields.io/badge/coverage-47.2%25-yellow)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-213%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Coverage](https://img.shields.io/badge/coverage-46.8%25-yellow)](https://github.com/linkeunid/ligo)
 
-> **Note:** Ligo **v0.9.6** is available. See the [Release Notes](docs/migration.md) for details.
+> **Note:** Ligo **v0.10.0** is available. Provider `OnInit` and `OnBootstrap` hooks now run sequentially by default — opt into the old parallel behaviour with `ligo.WithParallelHooks()`. `Resolve[T]` now returns `(T, error)`; use `MustResolve[T]` to keep the old panic-on-failure shape. See the [Migration Guide](docs/migration.md).
 
 ## Features
 
@@ -24,11 +24,11 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 ## Installation
 
 ```bash
-# Get the latest version (v0.9.6)
+# Get the latest version (v0.10.0)
 go get github.com/linkeunid/ligo@latest
 
 # Or specify a version
-go get github.com/linkeunid/ligo@v0.9.6
+go get github.com/linkeunid/ligo@v0.10.0
 ```
 
 ## Quick Start

@@ -1122,9 +1122,55 @@ func TestLifecycleHooks(t *testing.T) {
 		copy(calls, tracker.calls)
 		tracker.mu.Unlock()
 
-		// Provider OnInit hooks run in parallel (see
-		// executeProviderHooksParallel in app.go), so we don't assert
-		// ordering here — only that both fired exactly once.
+		// Default execution mode is sequential, so OnInit must fire in
+		// registration order — init-first before init-second.
+		var firstIdx, secondIdx int = -1, -1
+		for i, call := range calls {
+			switch call {
+			case "init-first":
+				firstIdx = i
+			case "init-second":
+				secondIdx = i
+			}
+		}
+		if firstIdx < 0 || secondIdx < 0 {
+			t.Fatalf("expected both init-first and init-second to fire. Calls: %v", calls)
+		}
+		if firstIdx > secondIdx {
+			t.Errorf("expected init-first before init-second, got first=%d second=%d. Calls: %v", firstIdx, secondIdx, calls)
+		}
+	})
+
+	t.Run("WithParallelHooks fires both without order guarantee", func(t *testing.T) {
+		tracker := &lifecycleTracker{calls: []string{}}
+
+		app := ligo.New(ligo.WithParallelHooks())
+		app.Register(
+			ligo.NewModule(
+				"test",
+				ligo.Providers(
+					ligo.Value(&orderedProvider{id: "first", tracker: tracker}),
+					ligo.Value(&orderedProviderTwo{id: "second", tracker: tracker}),
+				),
+			),
+		)
+
+		errCh := make(chan error, 1)
+		go func() { errCh <- app.Run() }()
+
+		time.Sleep(200 * time.Millisecond)
+
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+		<-errCh
+
+		tracker.mu.Lock()
+		calls := make([]string, len(tracker.calls))
+		copy(calls, tracker.calls)
+		tracker.mu.Unlock()
+
 		var foundFirst, foundSecond int
 		for _, call := range calls {
 			switch call {

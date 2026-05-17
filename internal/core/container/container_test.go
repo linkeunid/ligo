@@ -56,7 +56,7 @@ func TestResolveValue(t *testing.T) {
 	c := New()
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "resolved"}, nil, false, false, nil))
 
-	svc := Resolve[*testService](c)
+	svc := MustResolve[*testService](c)
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
@@ -68,13 +68,21 @@ func TestResolveValue(t *testing.T) {
 func TestResolveMissing(t *testing.T) {
 	c := New()
 
+	if _, err := Resolve[*testService](c); err == nil {
+		t.Fatal("expected error on missing dependency")
+	}
+}
+
+func TestMustResolveMissingPanics(t *testing.T) {
+	c := New()
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("expected panic on missing dependency")
 		}
 	}()
 
-	Resolve[*testService](c)
+	MustResolve[*testService](c)
 }
 
 func TestResolveFactory(t *testing.T) {
@@ -85,7 +93,7 @@ func TestResolveFactory(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
 
-	svc := Resolve[*testService](c)
+	svc := MustResolve[*testService](c)
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
@@ -104,8 +112,8 @@ func TestResolveTransient(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false, nil))
 
-	svc1 := Resolve[*testService](c)
-	svc2 := Resolve[*testService](c)
+	svc1 := MustResolve[*testService](c)
+	svc2 := MustResolve[*testService](c)
 
 	if svc1 == svc2 {
 		t.Fatal("expected different instances for transient")
@@ -125,8 +133,8 @@ func TestResolveSingleton(t *testing.T) {
 	}
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
 
-	svc1 := Resolve[*testService](c)
-	svc2 := Resolve[*testService](c)
+	svc1 := MustResolve[*testService](c)
+	svc2 := MustResolve[*testService](c)
 
 	if svc1 != svc2 {
 		t.Fatal("expected same instance for singleton")
@@ -150,7 +158,7 @@ func TestAutoInject(t *testing.T) {
 		reflect.TypeOf((*testService)(nil)),
 	}, false, false, nil))
 
-	wrapper := Resolve[*testWrapper](c)
+	wrapper := MustResolve[*testWrapper](c)
 	if wrapper.svc == nil {
 		t.Fatal("expected injected service")
 	}
@@ -178,13 +186,9 @@ func TestCircularDependency(t *testing.T) {
 		reflect.TypeOf((*testServiceA)(nil)),
 	}, false, false, nil))
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic on circular dependency")
-		}
-	}()
-
-	Resolve[*testServiceA](c)
+	if _, err := Resolve[*testServiceA](c); err == nil {
+		t.Fatal("expected error on circular dependency")
+	}
 }
 
 func TestDuplicateProvider(t *testing.T) {
@@ -196,7 +200,7 @@ func TestDuplicateProvider(t *testing.T) {
 	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "second"}, nil, false, false, nil))
 
 	// Verify the first provider is still used
-	svc := Resolve[*testService](c)
+	svc := MustResolve[*testService](c)
 	if svc.name != "first" {
 		t.Fatalf("expected first provider to be used, got %s", svc.name)
 	}
@@ -219,7 +223,7 @@ func TestConcurrentResolve(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx] = Resolve[*testService](c)
+			results[idx] = MustResolve[*testService](c)
 		}(i)
 	}
 	wg.Wait()
@@ -241,7 +245,7 @@ func TestResolveInterfaceTypeDirectKey(t *testing.T) {
 	doerType := reflect.TypeOf((*testDoer)(nil)).Elem()
 	c.Register(doerType, NewEntry(nil, testDoerImpl{}, nil, false, false, nil))
 
-	result := Resolve[testDoer](c)
+	result := MustResolve[testDoer](c)
 	if result.Do() != "done" {
 		t.Fatalf("expected 'done', got %s", result.Do())
 	}
@@ -263,7 +267,7 @@ func TestConcurrentTransient(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx] = Resolve[*testService](c)
+			results[idx] = MustResolve[*testService](c)
 		}(i)
 	}
 	wg.Wait()

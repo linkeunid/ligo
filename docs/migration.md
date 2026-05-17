@@ -10,6 +10,86 @@ This guide helps you migrate your Ligo applications between versions.
 
 ## [Migration Guide: 0.9.0 → 0.9.6](#090-→-096)
 
+## [Migration Guide: 0.9.x → 0.10.0](#09x-→-0100)
+
+---
+
+## 0.9.x → 0.10.0
+
+Two behavior changes to plan for, plus two additive APIs. All adjustments
+are mechanical.
+
+### Provider hooks now run sequentially by default
+
+`OnInit` and `OnBootstrap` previously fired in parallel goroutines, which
+made registration order non-deterministic. In 0.10.0 the default is
+sequential execution in the order providers were registered. Apps that
+relied on parallel execution opt in explicitly:
+
+```go
+// Before: parallel was implicit.
+app := ligo.New()
+
+// After: parallel is opt-in.
+app := ligo.New(ligo.WithParallelHooks())
+```
+
+Sequential is almost always what you want — it makes log output
+readable, makes failures easier to attribute to a specific provider, and
+guarantees ordering for providers that have informal startup
+dependencies (e.g., logger must be ready before the database hook
+prints). Opt back into parallel only when you have many independent
+providers whose startup work is I/O-bound and unordered.
+
+### `Resolve[T]` returns `(T, error)` instead of panicking
+
+The container's `Resolve[T]` now returns the resolution error rather
+than panicking on missing dependencies, ambiguous interfaces, or
+circular dependencies. A new `MustResolve[T]` preserves the old
+panic-on-failure behavior for cases where a failure really is fatal.
+
+```go
+// Before
+svc := di.Resolve[*UserService](container) // panic on failure
+
+// After — handle the error
+svc, err := di.Resolve[*UserService](container)
+if err != nil {
+    return fmt.Errorf("resolve user service: %w", err)
+}
+
+// After — keep the panic
+svc := di.MustResolve[*UserService](container)
+```
+
+The same split exists at the application level: `ligo.Resolve[T](app)`
+returns `(T, error)`, `ligo.MustResolve[T](app)` panics.
+
+`internal/di` is not a public package, so direct callers of `di.Resolve`
+are limited to the framework itself and ligo-* satellite repos. Use the
+new `ligo.Resolve` / `ligo.MustResolve` re-exports from application
+code.
+
+### New: `ligo.Resolve` / `ligo.MustResolve` (app-level)
+
+```go
+import "github.com/linkeunid/ligo"
+
+user, err := ligo.Resolve[*UserService](app)
+if err != nil { /* handle */ }
+
+// or, when failure should crash:
+user := ligo.MustResolve[*UserService](app)
+```
+
+Both must be called after `app.Run()` has built the container.
+
+### New: `ligo.WithParallelHooks()` Option
+
+Restores the pre-0.10.0 parallel execution of provider `OnInit` and
+`OnBootstrap` hooks. See "sequential by default" above for guidance on
+when to enable it.
+
 ---
 
 ## 0.9.0 → 0.9.6
