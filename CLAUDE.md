@@ -157,6 +157,14 @@ Node-20 removal.
 - Provider `OnInit` and `OnBootstrap` hooks run **sequentially** in registration order by default (since v0.10.0). Opt into the legacy parallel execution with `ligo.WithParallelHooks()` — only do this for many independent I/O-bound providers where ordering does not matter
 - `Resolve[T]` (both `di.Resolve` and the new `ligo.Resolve`) returns `(T, error)`. Use `MustResolve[T]` when a failure should crash the process; never panic from library code that has a non-fatal recovery path
 
+## Working Docs (not committed)
+
+`docs/superpowers/`, `docs/pull-requests/`, `docs/todos/` are gitignored.
+They hold session-scoped artifacts (brainstorming specs, PR drafts, audit
+reports, scratch plans) that should not land in the public repo. Never
+`git add` files under these paths — even when asked to commit "everything."
+Write freely, but stage and commit only files outside these directories.
+
 ## Dev Cycle
 
 Ligo is consumed as a Go module by sibling repos (`ligo-microservices`,

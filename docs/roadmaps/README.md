@@ -19,6 +19,14 @@ How Ligo separates concerns with optional packages for advanced features.
 - WebSocket, GraphQL, Scheduling packages
 - Comparison with NestJS ecosystem
 
+### [Webapp Stack Timeline](./webapp-stack-timeline.md)
+Phased plan to make Ligo a complete general webapp stack (Postgres + Auth/OAuth + Email + ops).
+- Phase 0: core hardening to v1.0
+- Phase 1 (P0): `ligo-config`, `ligo-auth`, `ligo-oauth`, `ligo-mail`
+- Phase 2: `ligo-cache`, `ligo-jobs`, `ligo-observability`, `ligo-health` (SQL migrations live inside `ligo-database`)
+- Phase 3: storage, i18n, ratelimit, swagger
+- Dependency graph + sample apps + open questions
+
 ### [Sneak Peek — What's Coming Next](./sneak-peek.md)
 Upcoming ecosystem packages in priority order.
 - **Priority 1:** Microservices + RabbitMQ (Request/Response + Pub-Sub)
