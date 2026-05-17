@@ -24,7 +24,8 @@ func BenchmarkLigoAppCreation(b *testing.B) {
 func BenchmarkLigoModuleCreation(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ligo.NewModule("test",
+		_ = ligo.NewModule(
+			"test",
 			ligo.Providers(
 				ligo.Value("test-value"),
 				ligo.Factory[*BenchService](func() *BenchService {
@@ -48,7 +49,8 @@ func BenchmarkLigoModuleWithMiddleware(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ligo.NewModule("test",
+		_ = ligo.NewModule(
+			"test",
 			ligo.Middlewares(
 				func() ligo.Middleware {
 					return testMiddleware
@@ -65,7 +67,8 @@ func BenchmarkLigoModuleWithMiddleware(b *testing.B) {
 func BenchmarkLigoModuleWithLifecycleHooks(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ligo.NewModule("test",
+		_ = ligo.NewModule(
+			"test",
 			ligo.OnModuleInit(func() error {
 				return nil
 			}),
@@ -125,7 +128,8 @@ func BenchmarkLigoModuleRegistration(b *testing.B) {
 			ligo.WithRouter(router),
 			ligo.WithAddr(":0"),
 		)
-		module := ligo.NewModule("test",
+		module := ligo.NewModule(
+			"test",
 			ligo.Providers(
 				ligo.Value("test-value"),
 			),
@@ -140,13 +144,16 @@ func BenchmarkLigoMultipleModules(b *testing.B) {
 	router := echo.NewAdapter()
 
 	modules := []ligo.Module{
-		ligo.NewModule("module1",
+		ligo.NewModule(
+			"module1",
 			ligo.Providers(ligo.Value("value1")),
 		),
-		ligo.NewModule("module2",
+		ligo.NewModule(
+			"module2",
 			ligo.Providers(ligo.Value("value2")),
 		),
-		ligo.NewModule("module3",
+		ligo.NewModule(
+			"module3",
 			ligo.Providers(ligo.Value("value3")),
 		),
 	}
@@ -172,14 +179,16 @@ func BenchmarkLigoDynamicModule(b *testing.B) {
 				name = n
 			}
 		}
-		return ligo.NewModule(name,
+		return ligo.NewModule(
+			name,
 			ligo.Providers(ligo.Value(name)),
 		)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ligo.NewModule("dynamic",
+		_ = ligo.NewModule(
+			"dynamic",
 			ligo.Dynamic(factory, "custom"),
 		)
 	}
@@ -189,7 +198,8 @@ func BenchmarkLigoDynamicModule(b *testing.B) {
 func BenchmarkLigoControllerRegistration(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ligo.NewModule("test",
+		_ = ligo.NewModule(
+			"test",
 			ligo.Controllers(
 				func() ligo.Controller {
 					return &benchController{}

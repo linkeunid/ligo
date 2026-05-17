@@ -5,11 +5,11 @@ type HookFunc func() error
 
 // HookRegistry stores lifecycle hooks with their associated type.
 type HookRegistry struct {
-	onInit     HookFunc
-	onBootstrap HookFunc
+	onInit         HookFunc
+	onBootstrap    HookFunc
 	beforeShutdown HookFunc
-	onShutdown HookFunc
-	onDestroy  HookFunc
+	onShutdown     HookFunc
+	onDestroy      HookFunc
 }
 
 // NewHookRegistry creates a new hook registry.
@@ -78,12 +78,12 @@ func (r *HookRegistry) RegisterFrom(target any) {
 // The registry reference is stored so hooks can be refreshed after RegisterFrom is called.
 func (r *HookRegistry) ToHooks() Hooks {
 	return Hooks{
-		OnInit:         r.onInit,
-		OnBootstrap:    r.onBootstrap,
+		OnInit:           r.onInit,
+		OnBootstrap:      r.onBootstrap,
 		OnBeforeShutdown: r.beforeShutdown,
-		OnDestroy:      r.onDestroy,
-		OnShutdown:     r.onShutdown,
-		registry:       r,
+		OnDestroy:        r.onDestroy,
+		OnShutdown:       r.onShutdown,
+		registry:         r,
 	}
 }
 
@@ -99,7 +99,7 @@ func (r *ModuleHookRegistry) GetDestroyHooks() []func() error {
 
 // ModuleHookRegistry stores module-level lifecycle hooks.
 type ModuleHookRegistry struct {
-	onInit   []func() error
+	onInit    []func() error
 	onDestroy []func() error
 }
 

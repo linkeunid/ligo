@@ -74,7 +74,7 @@ import "github.com/linkeunid/ligo/internal/core/lifecycle"
 //	    r.OnShutdown(d.Close)   // Typo "Conenct" → compile error
 //	}
 //
-	// Provider registration with HookedFactory
+// Provider registration with HookedFactory
 //	ligo.HookedFactory[*Database](NewDatabase)
 //	// OR with Value:
 //	ligo.Value(database, ligo.WithHooks())

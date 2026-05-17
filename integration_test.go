@@ -16,8 +16,8 @@ import (
 
 // TestDatabase is a test service that implements Register for compile-time safe hook registration.
 type TestDatabase struct {
-	conn          string
-	initCalled    *atomic.Bool
+	conn           string
+	initCalled     *atomic.Bool
 	shutdownCalled *atomic.Bool
 }
 
@@ -42,8 +42,8 @@ func (d *TestDatabase) Close() error {
 // Register implements the Registerable interface for compile-time safe hook registration.
 // Method expressions like d.Connect are type-checked by the compiler.
 func (d *TestDatabase) Register(r *ligo.HookRegistry) {
-	r.OnInit(d.Connect)    // If Connect doesn't exist → compile error
-	r.OnShutdown(d.Close)  // If Close doesn't exist → compile error
+	r.OnInit(d.Connect)   // If Connect doesn't exist → compile error
+	r.OnShutdown(d.Close) // If Close doesn't exist → compile error
 }
 
 // TestController is a test controller that forces TestDatabase resolution.
@@ -63,7 +63,8 @@ func TestAppLifecycle(t *testing.T) {
 		var onStartCalled, onStopCalled, moduleInitCalled, moduleDestroyCalled atomic.Bool
 
 		// Create a simple test module
-		testModule := ligo.NewModule("test",
+		testModule := ligo.NewModule(
+			"test",
 			ligo.OnModuleInit(func() error {
 				moduleInitCalled.Store(true)
 				return nil
@@ -128,7 +129,8 @@ func TestAppLifecycle(t *testing.T) {
 			order = append(order, s)
 		}
 
-		testModule := ligo.NewModule("order",
+		testModule := ligo.NewModule(
+			"order",
 			ligo.OnModuleInit(func() error {
 				addOrder("module-init")
 				return nil
@@ -189,7 +191,8 @@ func TestDIResolution(t *testing.T) {
 		// Create a test service
 		testService := &TestService{message: "injected"}
 
-		testModule := ligo.NewModule("di",
+		testModule := ligo.NewModule(
+			"di",
 			ligo.Providers(
 				ligo.Value(testService),
 			),
@@ -232,7 +235,8 @@ func TestDIResolution(t *testing.T) {
 		dbService := &DatabaseService{name: "test-db"}
 		cacheService := &CacheService{name: "test-cache"}
 
-		testModule := ligo.NewModule("multi",
+		testModule := ligo.NewModule(
+			"multi",
 			ligo.Providers(
 				ligo.Value(dbService),
 				ligo.Value(cacheService),
@@ -297,13 +301,15 @@ func (c *diController) getDI(ctx ligo.Context) error {
 
 // TestMultipleModules tests that multiple modules work together.
 func TestMultipleModules(t *testing.T) {
-	userModule := ligo.NewModule("user",
+	userModule := ligo.NewModule(
+		"user",
 		ligo.Providers(
 			ligo.Value(&UserService{name: "user-service"}),
 		),
 	)
 
-	productModule := ligo.NewModule("product",
+	productModule := ligo.NewModule(
+		"product",
 		ligo.Providers(
 			ligo.Value(&ProductService{name: "product-service"}),
 		),
@@ -349,14 +355,16 @@ type ProductService struct {
 // TestModuleImports tests that module imports work correctly.
 func TestModuleImports(t *testing.T) {
 	// Parent module that exports a provider
-	parentModule := ligo.NewModule("parent",
+	parentModule := ligo.NewModule(
+		"parent",
 		ligo.Providers(
 			ligo.Export(ligo.Value(&SharedService{name: "shared"})),
 		),
 	)
 
 	// Child module that imports parent
-	childModule := ligo.NewModule("child",
+	childModule := ligo.NewModule(
+		"child",
 		ligo.Imports(parentModule),
 	)
 
@@ -402,7 +410,8 @@ func TestDynamicModule(t *testing.T) {
 				configValue = s
 			}
 		}
-		return ligo.NewModule("config",
+		return ligo.NewModule(
+			"config",
 			ligo.Providers(
 				ligo.Value(configValue),
 			),
@@ -410,7 +419,8 @@ func TestDynamicModule(t *testing.T) {
 	}
 
 	// Register dynamic module with custom config
-	dynamicModule := ligo.NewModule("dynamic-wrapper",
+	dynamicModule := ligo.NewModule(
+		"dynamic-wrapper",
 		ligo.Dynamic(configModuleFactory, "custom-config"),
 	)
 
@@ -446,7 +456,8 @@ func TestDynamicModule(t *testing.T) {
 func TestModuleHooks(t *testing.T) {
 	var initCalled atomic.Bool
 
-	testModule := ligo.NewModule("hooks",
+	testModule := ligo.NewModule(
+		"hooks",
 		ligo.OnModuleInit(func() error {
 			initCalled.Store(true)
 			return nil
@@ -484,7 +495,8 @@ func TestModuleHooks(t *testing.T) {
 func TestControllerRegistration(t *testing.T) {
 	var controllerRoutesCalled atomic.Bool
 
-	testModule := ligo.NewModule("controller",
+	testModule := ligo.NewModule(
+		"controller",
 		ligo.Controllers(func() ligo.Controller {
 			return &simpleController{called: &controllerRoutesCalled}
 		}),
@@ -544,7 +556,8 @@ func TestMiddleware(t *testing.T) {
 		}
 	}
 
-	testModule := ligo.NewModule("mw",
+	testModule := ligo.NewModule(
+		"mw",
 		ligo.Middlewares(func() ligo.Middleware {
 			return testMiddleware
 		}),
@@ -584,7 +597,8 @@ func TestMiddleware(t *testing.T) {
 // TestProviderTypes tests all provider types.
 func TestProviderTypes(t *testing.T) {
 	t.Run("value provider", func(t *testing.T) {
-		module := ligo.NewModule("value",
+		module := ligo.NewModule(
+			"value",
 			ligo.Providers(
 				ligo.Value("test-value"),
 			),
@@ -619,7 +633,8 @@ func TestProviderTypes(t *testing.T) {
 	})
 
 	t.Run("factory provider", func(t *testing.T) {
-		module := ligo.NewModule("factory",
+		module := ligo.NewModule(
+			"factory",
 			ligo.Providers(
 				ligo.Factory[*TestService](func() *TestService {
 					return &TestService{message: "factory-created"}
@@ -656,7 +671,8 @@ func TestProviderTypes(t *testing.T) {
 	})
 
 	t.Run("transient provider", func(t *testing.T) {
-		module := ligo.NewModule("transient",
+		module := ligo.NewModule(
+			"transient",
 			ligo.Providers(
 				ligo.Transient[*TestService](func() *TestService {
 					return &TestService{message: "transient-created"}
@@ -779,7 +795,8 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("module with init error", func(t *testing.T) {
 		initError := fmt.Errorf("init failed")
 
-		module := ligo.NewModule("error",
+		module := ligo.NewModule(
+			"error",
 			ligo.OnModuleInit(func() error {
 				return initError
 			}),
@@ -826,17 +843,20 @@ func (c *importedController) Routes(r ligo.Router) {
 func TestImportedModuleRoutes(t *testing.T) {
 	var authCalls, userCalls atomic.Int32
 
-	authModule := ligo.NewModule("auth",
+	authModule := ligo.NewModule(
+		"auth",
 		ligo.Controllers(func() ligo.Controller {
 			return &importedController{path: "/auth/login", calls: &authCalls}
 		}),
 	)
-	userModule := ligo.NewModule("user",
+	userModule := ligo.NewModule(
+		"user",
 		ligo.Controllers(func() ligo.Controller {
 			return &importedController{path: "/user/list", calls: &userCalls}
 		}),
 	)
-	mainModule := ligo.NewModule("main",
+	mainModule := ligo.NewModule(
+		"main",
 		ligo.Imports(authModule, userModule),
 	)
 
@@ -866,7 +886,8 @@ func TestImportedModuleRoutes(t *testing.T) {
 func TestSharedImportRegisteredOnce(t *testing.T) {
 	var authCalls atomic.Int32
 
-	authModule := ligo.NewModule("shared-auth",
+	authModule := ligo.NewModule(
+		"shared-auth",
 		ligo.Controllers(func() ligo.Controller {
 			return &importedController{path: "/shared-auth/verify", calls: &authCalls}
 		}),
@@ -898,19 +919,22 @@ func TestSharedImportRegisteredOnce(t *testing.T) {
 func TestDynamicModuleWithImports(t *testing.T) {
 	var childCalls atomic.Int32
 
-	childModule := ligo.NewModule("dyn-child",
+	childModule := ligo.NewModule(
+		"dyn-child",
 		ligo.Controllers(func() ligo.Controller {
 			return &importedController{path: "/dyn-child/ping", calls: &childCalls}
 		}),
 	)
 
 	dynamicFactory := func(opts ...any) ligo.Module {
-		return ligo.NewModule("dyn-inner",
+		return ligo.NewModule(
+			"dyn-inner",
 			ligo.Imports(childModule),
 		)
 	}
 
-	wrapperModule := ligo.NewModule("dyn-wrapper",
+	wrapperModule := ligo.NewModule(
+		"dyn-wrapper",
 		ligo.Dynamic(dynamicFactory),
 	)
 
@@ -993,13 +1017,13 @@ func (p *orderedProvider) OnModuleInit() error {
 
 // TestLifecycleHooks tests the full lifecycle hook execution flow.
 func TestLifecycleHooks(t *testing.T) {
-
 	t.Run("non-HTTP mode executes all hooks", func(t *testing.T) {
 		tracker := &lifecycleTracker{calls: []string{}}
 
 		app := ligo.New()
 		app.Register(
-			ligo.NewModule("test",
+			ligo.NewModule(
+				"test",
 				ligo.Providers(
 					ligo.Value(&trackedProvider{tracker: tracker}),
 				),
@@ -1049,7 +1073,8 @@ func TestLifecycleHooks(t *testing.T) {
 
 		app := ligo.New()
 		app.Register(
-			ligo.NewModule("test",
+			ligo.NewModule(
+				"test",
 				ligo.Providers(
 					ligo.Value(&orderedProvider{id: "first", tracker: tracker}),
 					ligo.Value(&orderedProvider{id: "second", tracker: tracker}),
@@ -1103,9 +1128,11 @@ func TestExplicitHookRegistration(t *testing.T) {
 
 		app := ligo.New()
 		app.Register(
-			ligo.NewModule("test",
+			ligo.NewModule(
+				"test",
 				ligo.Providers(
-					ligo.Value(&struct{}{},
+					ligo.Value(
+						&struct{}{},
 						ligo.WithHooks(
 							ligo.OnInit(func() error {
 								initCalled.Store(true)
@@ -1152,7 +1179,8 @@ func TestExplicitHookRegistration(t *testing.T) {
 
 		app := ligo.New()
 		app.Register(
-			ligo.NewModule("test",
+			ligo.NewModule(
+				"test",
 				ligo.WithModuleHooks(
 					ligo.ModuleInit(func() error {
 						moduleInitCalled.Store(true)
@@ -1204,11 +1232,12 @@ func TestHookedSingleton_EagerResolve(t *testing.T) {
 
 		// Note: nothing in the DI graph depends on *TestDatabase. With
 		// HookedFactory this would be dead code; HookedSingleton forces it.
-		testModule := ligo.NewModule("test",
+		testModule := ligo.NewModule(
+			"test",
 			ligo.Providers(
 				ligo.HookedSingleton[*TestDatabase](func() *TestDatabase {
 					return &TestDatabase{
-						initCalled:    &initCalled,
+						initCalled:     &initCalled,
 						shutdownCalled: &shutdownCalled,
 					}
 				}),
@@ -1246,12 +1275,13 @@ func TestHookedFactory_RegisterMethod(t *testing.T) {
 		var initCalled, shutdownCalled atomic.Bool
 
 		db := &TestDatabase{
-			initCalled:    &initCalled,
+			initCalled:     &initCalled,
 			shutdownCalled: &shutdownCalled,
 		}
 
 		// Module using Value with Hooks - RegisterFrom is called immediately for eager providers
-		testModule := ligo.NewModule("test",
+		testModule := ligo.NewModule(
+			"test",
 			ligo.Providers(
 				ligo.Value(db, ligo.WithHooks()),
 			),

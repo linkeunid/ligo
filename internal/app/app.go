@@ -7,10 +7,10 @@ import (
 	"reflect"
 	"syscall"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 // mergeHooks merges source hooks into destination, preserving non-nil destination hooks.

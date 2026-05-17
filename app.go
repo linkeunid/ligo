@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	"github.com/linkeunid/ligo/internal/app"
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/http"
 )
 

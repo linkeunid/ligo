@@ -17,16 +17,16 @@ const (
 )
 
 type options struct {
-	router             Router
-	addr               string
-	middlewares        []Middleware
-	debug              bool
-	logger             Logger
-	gracefulShutdown  bool
-	gracefulTimeout    time.Duration
-	onStart            []LifecycleHook
-	onStop             []LifecycleHook
-	autoPort           bool
+	router           Router
+	addr             string
+	middlewares      []Middleware
+	debug            bool
+	logger           Logger
+	gracefulShutdown bool
+	gracefulTimeout  time.Duration
+	onStart          []LifecycleHook
+	onStop           []LifecycleHook
+	autoPort         bool
 }
 
 // Logger is the interface for framework logging.

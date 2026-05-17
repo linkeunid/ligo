@@ -5,17 +5,17 @@ import (
 	"net/http/httptest"
 	"strconv"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
+	"github.com/linkeunid/ligo/internal/di"
 	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
 // MockContext is a mock implementation of ligo.Context for testing.
 type MockContext struct {
-	values    map[string]any
-	req       *http.Request
-	resp      http.ResponseWriter
-	reqCont   *di.Container
+	values  map[string]any
+	req     *http.Request
+	resp    http.ResponseWriter
+	reqCont *di.Container
 }
 
 // NewMockContext creates a new mock context for testing.
@@ -124,33 +124,33 @@ func (m *MockContext) GetRequestContainer() *di.Container {
 
 // HTTP response helpers (mock implementations)
 
-func (m *MockContext) OK(v any) error                         { return nil }
-func (m *MockContext) Created(v any) error                    { return nil }
-func (m *MockContext) Accepted(v any) error                   { return nil }
-func (m *MockContext) NoContent() error                       { return nil }
-func (m *MockContext) List(items any) error                                   { return nil }
+func (m *MockContext) OK(v any) error                                            { return nil }
+func (m *MockContext) Created(v any) error                                       { return nil }
+func (m *MockContext) Accepted(v any) error                                      { return nil }
+func (m *MockContext) NoContent() error                                          { return nil }
+func (m *MockContext) List(items any) error                                      { return nil }
 func (m *MockContext) Paginated(items any, page, perPage int, total int64) error { return nil }
-func (m *MockContext) BadRequest(msg ...string) error         { return nil }
-func (m *MockContext) Unauthorized(msg ...string) error       { return nil }
-func (m *MockContext) Forbidden(msg ...string) error          { return nil }
-func (m *MockContext) NotFound(msg ...string) error           { return nil }
-func (m *MockContext) MethodNotAllowed(msg ...string) error   { return nil }
-func (m *MockContext) NotAcceptable(msg ...string) error      { return nil }
-func (m *MockContext) RequestTimeout(msg ...string) error     { return nil }
-func (m *MockContext) Conflict(msg ...string) error           { return nil }
-func (m *MockContext) Gone(msg ...string) error               { return nil }
-func (m *MockContext) PreconditionFailed(msg ...string) error { return nil }
-func (m *MockContext) PayloadTooLarge(msg ...string) error    { return nil }
-func (m *MockContext) UnsupportedMediaType(msg ...string) error { return nil }
-func (m *MockContext) UnprocessableEntity(msg ...string) error { return nil }
-func (m *MockContext) TooManyRequests(msg ...string) error      { return nil }
-func (m *MockContext) InternalServerError(msg ...string) error  { return nil }
-func (m *MockContext) NotImplemented(msg ...string) error      { return nil }
-func (m *MockContext) BadGateway(msg ...string) error          { return nil }
-func (m *MockContext) ServiceUnavailable(msg ...string) error  { return nil }
-func (m *MockContext) GatewayTimeout(msg ...string) error      { return nil }
-func (m *MockContext) HTTPVersionNotSupported(msg ...string) error { return nil }
-func (m *MockContext) Stream(reader any) error                 { return nil }
+func (m *MockContext) BadRequest(msg ...string) error                            { return nil }
+func (m *MockContext) Unauthorized(msg ...string) error                          { return nil }
+func (m *MockContext) Forbidden(msg ...string) error                             { return nil }
+func (m *MockContext) NotFound(msg ...string) error                              { return nil }
+func (m *MockContext) MethodNotAllowed(msg ...string) error                      { return nil }
+func (m *MockContext) NotAcceptable(msg ...string) error                         { return nil }
+func (m *MockContext) RequestTimeout(msg ...string) error                        { return nil }
+func (m *MockContext) Conflict(msg ...string) error                              { return nil }
+func (m *MockContext) Gone(msg ...string) error                                  { return nil }
+func (m *MockContext) PreconditionFailed(msg ...string) error                    { return nil }
+func (m *MockContext) PayloadTooLarge(msg ...string) error                       { return nil }
+func (m *MockContext) UnsupportedMediaType(msg ...string) error                  { return nil }
+func (m *MockContext) UnprocessableEntity(msg ...string) error                   { return nil }
+func (m *MockContext) TooManyRequests(msg ...string) error                       { return nil }
+func (m *MockContext) InternalServerError(msg ...string) error                   { return nil }
+func (m *MockContext) NotImplemented(msg ...string) error                        { return nil }
+func (m *MockContext) BadGateway(msg ...string) error                            { return nil }
+func (m *MockContext) ServiceUnavailable(msg ...string) error                    { return nil }
+func (m *MockContext) GatewayTimeout(msg ...string) error                        { return nil }
+func (m *MockContext) HTTPVersionNotSupported(msg ...string) error               { return nil }
+func (m *MockContext) Stream(reader any) error                                   { return nil }
 
 // MockLogger is a mock implementation of logger.Logger for testing.
 type MockLogger struct {

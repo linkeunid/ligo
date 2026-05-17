@@ -9,11 +9,11 @@ import (
 
 // AllHooksProvider implements all 5 lifecycle hooks
 type AllHooksProvider struct {
-	initCalled         bool
-	bootstrapCalled    bool
+	initCalled           bool
+	bootstrapCalled      bool
 	beforeShutdownCalled bool
-	destroyCalled      bool
-	shutdownCalled     bool
+	destroyCalled        bool
+	shutdownCalled       bool
 }
 
 func (m *AllHooksProvider) OnModuleInit() error {
@@ -110,22 +110,22 @@ func (m *DestroyAndShutdownProvider) OnApplicationShutdown() error {
 
 func TestCollectProviderHooks(t *testing.T) {
 	tests := []struct {
-		name             string
-		provider         any
-		wantInit         bool
-		wantBoot         bool
+		name               string
+		provider           any
+		wantInit           bool
+		wantBoot           bool
 		wantBeforeShutdown bool
-		wantDestroy      bool
-		wantShutdown     bool
+		wantDestroy        bool
+		wantShutdown       bool
 	}{
 		{
-			name:             "all hooks implemented",
-			provider:         &AllHooksProvider{},
-			wantInit:         true,
-			wantBoot:         true,
+			name:               "all hooks implemented",
+			provider:           &AllHooksProvider{},
+			wantInit:           true,
+			wantBoot:           true,
 			wantBeforeShutdown: true,
-			wantDestroy:      true,
-			wantShutdown:     true,
+			wantDestroy:        true,
+			wantShutdown:       true,
 		},
 		{
 			name:     "init only",
@@ -138,9 +138,9 @@ func TestCollectProviderHooks(t *testing.T) {
 			wantBoot: true,
 		},
 		{
-			name:         "destroy only",
-			provider:     &DestroyOnlyProvider{},
-			wantDestroy:  true,
+			name:        "destroy only",
+			provider:    &DestroyOnlyProvider{},
+			wantDestroy: true,
 		},
 		{
 			name:         "shutdown only",
@@ -148,8 +148,8 @@ func TestCollectProviderHooks(t *testing.T) {
 			wantShutdown: true,
 		},
 		{
-			name:             "before shutdown only",
-			provider:         &BeforeShutdownOnlyProvider{},
+			name:               "before shutdown only",
+			provider:           &BeforeShutdownOnlyProvider{},
 			wantBeforeShutdown: true,
 		},
 		{

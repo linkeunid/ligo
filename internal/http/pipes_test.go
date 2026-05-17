@@ -27,47 +27,47 @@ func (m *mockBindContext) Get(key string) any      { return m.store[key] }
 
 type mockContextBase struct{}
 
-func (mockContextBase) Param(_ string) string                    { return "" }
-func (mockContextBase) Query(_ string) string                    { return "" }
-func (mockContextBase) QueryDefault(_, def string) string        { return def }
-func (mockContextBase) QueryInt(_ string, def int) int           { return def }
-func (mockContextBase) BindQuery(_ any) error                    { return nil }
-func (mockContextBase) Paginate(_, _ int) ListQuery              { return ListQuery{} }
-func (mockContextBase) JSON(_ int, _ any) error                  { return nil }
-func (mockContextBase) String(_ int, _ string) error             { return nil }
-func (mockContextBase) OK(_ any) error                           { return nil }
-func (mockContextBase) Created(_ any) error                      { return nil }
-func (mockContextBase) Accepted(_ any) error                     { return nil }
-func (mockContextBase) NoContent() error                         { return nil }
-func (mockContextBase) List(_ any) error                         { return nil }
-func (mockContextBase) Paginated(_ any, _, _ int, _ int64) error { return nil }
-func (mockContextBase) BadRequest(_ ...string) error                { return nil }
-func (mockContextBase) Unauthorized(_ ...string) error              { return nil }
-func (mockContextBase) Forbidden(_ ...string) error                 { return nil }
-func (mockContextBase) NotFound(_ ...string) error                  { return nil }
-func (mockContextBase) MethodNotAllowed(_ ...string) error          { return nil }
-func (mockContextBase) NotAcceptable(_ ...string) error             { return nil }
-func (mockContextBase) RequestTimeout(_ ...string) error            { return nil }
-func (mockContextBase) Conflict(_ ...string) error                  { return nil }
-func (mockContextBase) Gone(_ ...string) error                      { return nil }
-func (mockContextBase) PreconditionFailed(_ ...string) error        { return nil }
-func (mockContextBase) PayloadTooLarge(_ ...string) error           { return nil }
-func (mockContextBase) UnsupportedMediaType(_ ...string) error      { return nil }
-func (mockContextBase) UnprocessableEntity(_ ...string) error       { return nil }
-func (mockContextBase) TooManyRequests(_ ...string) error           { return nil }
-func (mockContextBase) ImATeapot(_ ...string) error                 { return nil }
-func (mockContextBase) InternalServerError(_ ...string) error       { return nil }
-func (mockContextBase) NotImplemented(_ ...string) error            { return nil }
-func (mockContextBase) BadGateway(_ ...string) error                { return nil }
-func (mockContextBase) ServiceUnavailable(_ ...string) error        { return nil }
-func (mockContextBase) GatewayTimeout(_ ...string) error            { return nil }
-func (mockContextBase) HTTPVersionNotSupported(_ ...string) error   { return nil }
-func (mockContextBase) Header(_ string) string                   { return "" }
-func (mockContextBase) Stream(_ any) error                       { return nil }
-func (mockContextBase) Request() *nethttp.Request                           { return nil }
-func (mockContextBase) Response() nethttp.ResponseWriter                    { return nil }
-func (mockContextBase) SetRequestContainer(_ *di.Container)          {}
-func (mockContextBase) GetRequestContainer() *di.Container           { return nil }
+func (mockContextBase) Param(_ string) string                     { return "" }
+func (mockContextBase) Query(_ string) string                     { return "" }
+func (mockContextBase) QueryDefault(_, def string) string         { return def }
+func (mockContextBase) QueryInt(_ string, def int) int            { return def }
+func (mockContextBase) BindQuery(_ any) error                     { return nil }
+func (mockContextBase) Paginate(_, _ int) ListQuery               { return ListQuery{} }
+func (mockContextBase) JSON(_ int, _ any) error                   { return nil }
+func (mockContextBase) String(_ int, _ string) error              { return nil }
+func (mockContextBase) OK(_ any) error                            { return nil }
+func (mockContextBase) Created(_ any) error                       { return nil }
+func (mockContextBase) Accepted(_ any) error                      { return nil }
+func (mockContextBase) NoContent() error                          { return nil }
+func (mockContextBase) List(_ any) error                          { return nil }
+func (mockContextBase) Paginated(_ any, _, _ int, _ int64) error  { return nil }
+func (mockContextBase) BadRequest(_ ...string) error              { return nil }
+func (mockContextBase) Unauthorized(_ ...string) error            { return nil }
+func (mockContextBase) Forbidden(_ ...string) error               { return nil }
+func (mockContextBase) NotFound(_ ...string) error                { return nil }
+func (mockContextBase) MethodNotAllowed(_ ...string) error        { return nil }
+func (mockContextBase) NotAcceptable(_ ...string) error           { return nil }
+func (mockContextBase) RequestTimeout(_ ...string) error          { return nil }
+func (mockContextBase) Conflict(_ ...string) error                { return nil }
+func (mockContextBase) Gone(_ ...string) error                    { return nil }
+func (mockContextBase) PreconditionFailed(_ ...string) error      { return nil }
+func (mockContextBase) PayloadTooLarge(_ ...string) error         { return nil }
+func (mockContextBase) UnsupportedMediaType(_ ...string) error    { return nil }
+func (mockContextBase) UnprocessableEntity(_ ...string) error     { return nil }
+func (mockContextBase) TooManyRequests(_ ...string) error         { return nil }
+func (mockContextBase) ImATeapot(_ ...string) error               { return nil }
+func (mockContextBase) InternalServerError(_ ...string) error     { return nil }
+func (mockContextBase) NotImplemented(_ ...string) error          { return nil }
+func (mockContextBase) BadGateway(_ ...string) error              { return nil }
+func (mockContextBase) ServiceUnavailable(_ ...string) error      { return nil }
+func (mockContextBase) GatewayTimeout(_ ...string) error          { return nil }
+func (mockContextBase) HTTPVersionNotSupported(_ ...string) error { return nil }
+func (mockContextBase) Header(_ string) string                    { return "" }
+func (mockContextBase) Stream(_ any) error                        { return nil }
+func (mockContextBase) Request() *nethttp.Request                 { return nil }
+func (mockContextBase) Response() nethttp.ResponseWriter          { return nil }
+func (mockContextBase) SetRequestContainer(_ *di.Container)       {}
+func (mockContextBase) GetRequestContainer() *di.Container        { return nil }
 
 type testInput struct {
 	Name string

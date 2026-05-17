@@ -154,7 +154,8 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 				// Cache the interface->concrete mapping
 				c.interfaceCache.Store(requestedTyp, typ)
 				if c.logger != nil {
-					c.logger.LogWithContext(logger.ContextDIContainer, "Interface resolved",
+					c.logger.LogWithContext(
+						logger.ContextDIContainer, "Interface resolved",
 						logger.Field{Key: "interface", Value: requestedTyp.String()},
 						logger.Field{Key: "concrete", Value: matchType.String()},
 					)
@@ -240,7 +241,8 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 			if len(depNames) > 0 {
 				deps = strings.Join(depNames, ", ")
 			}
-			c.logger.LogWithContext(logger.ContextDIContainer, "Constructing "+typ.String(),
+			c.logger.LogWithContext(
+				logger.ContextDIContainer, "Constructing "+typ.String(),
 				logger.Field{Key: "deps", Value: deps},
 			)
 		}

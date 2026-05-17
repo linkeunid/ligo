@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 type mockRouter struct {
@@ -15,8 +15,8 @@ type mockRouter struct {
 }
 
 func (m *mockRouter) Group(prefix string) Router { return m }
-func (m *mockRouter) Use(mw ...Middleware)        {}
-func (m *mockRouter) Serve(addr string) error     { return nil }
+func (m *mockRouter) Use(mw ...Middleware)       {}
+func (m *mockRouter) Serve(addr string) error    { return nil }
 func (m *mockRouter) Handle(method, path string, _ HandlerFunc) {
 	m.routes = append(m.routes, method+":"+path)
 }
@@ -41,10 +41,12 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 	t.Run("controllers from imported child module are bound", func(t *testing.T) {
 		var authCalls, userCalls atomic.Int32
 
-		authMod := module.New("auth",
+		authMod := module.New(
+			"auth",
 			module.Controllers(newMockController("/auth/login", &authCalls)),
 		)
-		mainMod := module.New("main",
+		mainMod := module.New(
+			"main",
 			module.Imports(authMod),
 			module.Controllers(newMockController("/health", &userCalls)),
 		)
@@ -70,14 +72,17 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 	t.Run("deeply nested imports are all bound", func(t *testing.T) {
 		var dbCalls, repoCalls, svcCalls atomic.Int32
 
-		dbMod := module.New("db",
+		dbMod := module.New(
+			"db",
 			module.Controllers(newMockController("/db/ping", &dbCalls)),
 		)
-		repoMod := module.New("repo",
+		repoMod := module.New(
+			"repo",
 			module.Imports(dbMod),
 			module.Controllers(newMockController("/repo/list", &repoCalls)),
 		)
-		svcMod := module.New("svc",
+		svcMod := module.New(
+			"svc",
 			module.Imports(repoMod),
 			module.Controllers(newMockController("/svc/call", &svcCalls)),
 		)
@@ -106,7 +111,8 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 	t.Run("module with no imports binds only own controllers", func(t *testing.T) {
 		var calls atomic.Int32
 
-		mod := module.New("standalone",
+		mod := module.New(
+			"standalone",
 			module.Controllers(newMockController("/ping", &calls)),
 		)
 
@@ -132,7 +138,8 @@ func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
 	c := di.New()
 	// Do NOT register myBinderService — binder should return ErrControllerBinding
 
-	mod := module.New("user",
+	mod := module.New(
+		"user",
 		module.Controllers(func(svc *myBinderService) Controller {
 			return nil
 		}),

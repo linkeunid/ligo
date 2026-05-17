@@ -93,8 +93,8 @@ func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) 
 }
 
 var (
-	throttleStore = make(map[string]*throttleEntry)
-	throttleMu    sync.Mutex
+	throttleStore  = make(map[string]*throttleEntry)
+	throttleMu     sync.Mutex
 	cleanupStarted atomic.Bool
 )
 

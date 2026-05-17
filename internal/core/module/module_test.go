@@ -183,7 +183,8 @@ func TestModuleOptionsCombined(t *testing.T) {
 	initFn := func() error { return nil }
 	destroyFn := func() error { return nil }
 
-	m := New("test",
+	m := New(
+		"test",
 		Providers(provider),
 		Controllers(ctrl),
 		Middlewares(mw),

@@ -86,8 +86,6 @@ const (
 
 // Re-exported pipe errors
 
-var (
-	// ErrBadRequest is the sentinel error wrapped by pipes when client input is invalid.
-	// Exception handlers can detect it with errors.Is(err, ligo.ErrBadRequest).
-	ErrBadRequest = pipes.ErrBadRequest
-)
+// ErrBadRequest is the sentinel error wrapped by pipes when client input is invalid.
+// Exception handlers can detect it with errors.Is(err, ligo.ErrBadRequest).
+var ErrBadRequest = pipes.ErrBadRequest

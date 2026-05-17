@@ -36,12 +36,12 @@ type OnApplicationShutdown interface {
 
 // Hooks holds lifecycle hook functions for a single provider or controller.
 type Hooks struct {
-	OnInit         func() error
-	OnBootstrap    func() error
+	OnInit           func() error
+	OnBootstrap      func() error
 	OnBeforeShutdown func() error
-	OnDestroy      func() error
-	OnShutdown     func() error
-	registry       *HookRegistry // Optional: reference to registry for dynamic hook refresh
+	OnDestroy        func() error
+	OnShutdown       func() error
+	registry         *HookRegistry // Optional: reference to registry for dynamic hook refresh
 }
 
 // Refresh updates hooks from the registry if it exists and returns the updated hooks.

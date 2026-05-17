@@ -5,7 +5,8 @@ import (
 )
 
 func TestNewModule(t *testing.T) {
-	mod := NewModule("users",
+	mod := NewModule(
+		"users",
 		Providers(
 			Factory[*testService](func() *testService { return &testService{} }),
 		),
@@ -20,7 +21,8 @@ func TestNewModule(t *testing.T) {
 
 func TestModuleWithImports(t *testing.T) {
 	child := NewModule("child")
-	parent := NewModule("parent",
+	parent := NewModule(
+		"parent",
 		Imports(child),
 	)
 	if len(parent.Imports) != 1 {
@@ -29,7 +31,8 @@ func TestModuleWithImports(t *testing.T) {
 }
 
 func TestModuleWithControllers(t *testing.T) {
-	mod := NewModule("users",
+	mod := NewModule(
+		"users",
 		Controllers(func() Controller { return nil }),
 	)
 	if len(mod.Controllers) != 1 {

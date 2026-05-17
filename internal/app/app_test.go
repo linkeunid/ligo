@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 type mockProvider struct {
@@ -148,7 +148,8 @@ func TestRegisterProvider(t *testing.T) {
 func TestBuildModule(t *testing.T) {
 	t.Run("simple module with providers", func(t *testing.T) {
 		c := di.New()
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.Providers(&mockProvider{eager: "provider1"}),
 		)
 
@@ -163,7 +164,8 @@ func TestBuildModule(t *testing.T) {
 
 	t.Run("module with init hook", func(t *testing.T) {
 		c := di.New()
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.OnModuleInit(func() error {
 				return nil
 			}),
@@ -182,7 +184,8 @@ func TestBuildModule(t *testing.T) {
 
 	t.Run("module with destroy hook", func(t *testing.T) {
 		c := di.New()
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.OnModuleDestroy(func() error {
 				return nil
 			}),
@@ -198,10 +201,12 @@ func TestBuildModule(t *testing.T) {
 
 	t.Run("module with imported modules", func(t *testing.T) {
 		c := di.New()
-		imported := module.New("imported",
+		imported := module.New(
+			"imported",
 			module.Providers(&mockProvider{eager: "imported-provider"}),
 		)
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.Imports(imported),
 		)
 
@@ -220,12 +225,14 @@ func TestBuildModule(t *testing.T) {
 		c := di.New()
 
 		dynamicFactory := func(opts ...any) module.Module {
-			return module.New("dynamic",
+			return module.New(
+				"dynamic",
 				module.Providers(&mockProvider{eager: "dynamic-provider"}),
 			)
 		}
 
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.Dynamic(dynamicFactory),
 		)
 
@@ -251,7 +258,8 @@ func TestBuildModule(t *testing.T) {
 		exported := &mockProvider{typ: reflect.TypeOf(&ExportedType{}), eager: &ExportedType{}, isExported: true}
 		notExported := &mockProvider{typ: reflect.TypeOf(&NotExportedType{}), eager: &NotExportedType{}, isExported: false}
 
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.Providers(exported, notExported),
 		)
 
@@ -278,7 +286,6 @@ func TestExecuteHooks(t *testing.T) {
 
 		log := logger.New()
 		err := ExecuteHooks(hooks, log, "test")
-
 		if err != nil {
 			t.Errorf("ExecuteHooks() returned error: %v", err)
 		}
@@ -323,7 +330,6 @@ func TestExecuteHooks(t *testing.T) {
 		log := logger.New()
 
 		err := ExecuteHooks(hooks, log, "test")
-
 		if err != nil {
 			t.Errorf("ExecuteHooks() with empty hooks returned error: %v", err)
 		}
@@ -343,7 +349,6 @@ func TestExecuteHooks(t *testing.T) {
 
 		log := logger.New()
 		err := ExecuteHooks(hooks, log, "test")
-
 		if err != nil {
 			t.Errorf("ExecuteHooks() returned error: %v", err)
 		}
@@ -386,7 +391,8 @@ func TestModuleHooks(t *testing.T) {
 func TestExpandModule(t *testing.T) {
 	t.Run("basic module with no imports", func(t *testing.T) {
 		visited := map[string]bool{}
-		m := module.New("auth",
+		m := module.New(
+			"auth",
 			module.Providers(&mockProvider{eager: "auth-svc"}),
 		)
 
@@ -423,12 +429,14 @@ func TestExpandModule(t *testing.T) {
 
 		factory := func(opts ...any) module.Module {
 			called = true
-			return module.New("inner",
+			return module.New(
+				"inner",
 				module.Providers(&mockProvider{eager: "dynamic-svc"}),
 			)
 		}
 
-		m := module.New("wrapper",
+		m := module.New(
+			"wrapper",
 			module.Dynamic(factory),
 		)
 
@@ -457,7 +465,8 @@ func TestExpandModule(t *testing.T) {
 			return module.New("cfg")
 		}
 
-		m := module.New("wrapper",
+		m := module.New(
+			"wrapper",
 			module.Dynamic(factory, "opt1", 42),
 		)
 
@@ -544,7 +553,8 @@ func TestExplicitHooks(t *testing.T) {
 			return nil
 		})
 
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.Hooks(registry),
 		)
 
@@ -566,7 +576,8 @@ func TestExplicitHooks(t *testing.T) {
 			return nil
 		})
 
-		m := module.New("test",
+		m := module.New(
+			"test",
 			module.OnModuleInit(func() error {
 				return nil
 			}),

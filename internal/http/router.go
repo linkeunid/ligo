@@ -3,8 +3,8 @@ package http
 import (
 	"context"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/logger"
+	"github.com/linkeunid/ligo/internal/di"
 )
 
 // Router abstracts the HTTP router implementation.

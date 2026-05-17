@@ -22,10 +22,85 @@ go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out  # 
 go test -bench=. -benchmem ./...        # Benchmarks
 go test -run TestName ./...             # Single test
 go test -race ./...                     # Race detector
-golangci-lint run                       # Lint
-go fmt ./...                            # Format
+golangci-lint run                       # Lint (config: .golangci.yml)
+gofumpt -w .                            # Format (stricter than gofmt)
+govulncheck ./...                       # Vulnerability scan (stdlib + deps)
+staticcheck ./...                       # Standalone staticcheck (also in golangci)
 go mod tidy                             # Tidy deps
 ```
+
+### Static analysis stack
+
+Every ligo* repo ships `.golangci.yml` enabling `errcheck`, `govet`,
+`ineffassign`, `staticcheck`, `unused`, `gofumpt`, `misspell`,
+`unconvert`, `unparam`, `revive`, `bodyclose`, `errorlint`,
+`nolintlint`. `govet.enable` adds gopls's `infertypeargs`, `shadow`,
+`nilness`, and `fieldalignment`.
+
+`infertypeargs` matters: it flags `Pkg.Generic[T](...)` calls where `T`
+is inferable from the arguments. Required reading:
+https://pkg.go.dev/golang.org/x/tools/gopls/internal/analysis/infertypeargs.
+The IDE (gopls) surfaces these as warnings; CI catches them via
+`golangci-lint`. Strip the explicit type args — they add visual noise
+and drift out of sync with the underlying signature.
+
+Install the toolchain once:
+
+```bash
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install honnef.co/go/tools/cmd/staticcheck@latest
+go install mvdan.cc/gofumpt@latest
+go install golang.org/x/vuln/cmd/govulncheck@latest
+go install golang.org/x/tools/gopls@latest
+go install github.com/daixiang0/gci@latest
+```
+
+### Import order (gci)
+
+`gci` is enabled in `.golangci.yml` to keep import blocks uniform across
+the codebase. Three groups, in this order, separated by a blank line:
+
+1. **Standard library** (`context`, `fmt`, `net/http`, …)
+2. **Third-party** (`github.com/labstack/echo/v5`, `github.com/jackc/...`)
+3. **Local** — anything under `github.com/linkeunid/`
+
+```go
+import (
+    "context"
+    "fmt"
+
+    "github.com/labstack/echo/v5"
+
+    "github.com/linkeunid/ligo"
+    "github.com/linkeunid/ligo-microservices"
+)
+```
+
+Auto-fix a whole tree:
+
+```bash
+gci write --skip-generated \
+    -s standard -s default -s "prefix(github.com/linkeunid/)" \
+    --custom-order .
+```
+
+Outside the linkeunid org, replace the `prefix(...)` value with the
+consuming module's path so local imports group correctly.
+
+Pre-release checklist for any change touching exported API:
+
+```bash
+gci write --skip-generated -s standard -s default \
+    -s "prefix(github.com/linkeunid/)" --custom-order .  # imports order
+gofumpt -w .            # auto-fix formatting
+go test -race ./...     # tests + race detector
+golangci-lint run       # static checks (incl. infertypeargs, gci, tagalign)
+govulncheck ./...       # CVE scan — must come back clean for stdlib
+```
+
+If `govulncheck` flags stdlib CVEs, bump Go (e.g. `mise install go@latest`
+then update `go.mod`). Dependency CVEs that don't reach a call path are
+informational; ones in actual call paths block release.
 
 ## Conventions
 

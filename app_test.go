@@ -41,7 +41,8 @@ func TestAppProvide(t *testing.T) {
 
 func TestAppRunResolvesModules(t *testing.T) {
 	app := New()
-	app.Register(NewModule("test",
+	app.Register(NewModule(
+		"test",
 		Providers(
 			Value(&testSvc{name: "svc"}),
 		),
@@ -128,7 +129,8 @@ func TestAppProvideLocksApp(t *testing.T) {
 
 func TestAppContainerEscapeHatch(t *testing.T) {
 	app := New()
-	app.Register(NewModule("test",
+	app.Register(NewModule(
+		"test",
 		Providers(Value(&testSvc{name: "hatch"})),
 	))
 

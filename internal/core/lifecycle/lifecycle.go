@@ -8,12 +8,12 @@ import (
 
 // AppLifecycle manages application startup, shutdown, and graceful termination.
 type AppLifecycle struct {
-	mu       sync.Mutex
-	started  bool
-	hooks    [][]LifecycleHook
-	onStart  []func(ctx context.Context) error
-	onStop   []func(ctx context.Context) error
-	server   *http.Server
+	mu      sync.Mutex
+	started bool
+	hooks   [][]LifecycleHook
+	onStart []func(ctx context.Context) error
+	onStop  []func(ctx context.Context) error
+	server  *http.Server
 }
 
 // LifecycleHook is a function called during app lifecycle events.

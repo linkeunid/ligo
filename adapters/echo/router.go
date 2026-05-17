@@ -12,10 +12,11 @@ import (
 	"sync"
 
 	echo "github.com/labstack/echo/v5"
-	httpifc "github.com/linkeunid/ligo/internal/http"
-	"github.com/linkeunid/ligo/internal/di"
-	"github.com/linkeunid/ligo/internal/core/logger"
+
 	app "github.com/linkeunid/ligo/internal/app"
+	"github.com/linkeunid/ligo/internal/core/logger"
+	"github.com/linkeunid/ligo/internal/di"
+	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
 const errorMsgKey = "error"
@@ -160,9 +161,9 @@ func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.
 }
 
 type contextAdapter struct {
-	c         *echo.Context
-	values    map[string]any
-	reqCont   *di.Container
+	c       *echo.Context
+	values  map[string]any
+	reqCont *di.Container
 }
 
 var contextPool = sync.Pool{

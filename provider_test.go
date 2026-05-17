@@ -9,8 +9,10 @@ type testService struct {
 	name string
 }
 
-type testDoer interface{ Do() string }
-type testDoerImpl struct{}
+type (
+	testDoer     interface{ Do() string }
+	testDoerImpl struct{}
+)
 
 func (testDoerImpl) Do() string { return "done" }
 

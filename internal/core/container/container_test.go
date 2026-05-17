@@ -25,14 +25,18 @@ type testWrapper struct {
 	svc *testService
 }
 
-type testDoer interface{ Do() string }
-type testDoerImpl struct{}
+type (
+	testDoer     interface{ Do() string }
+	testDoerImpl struct{}
+)
 
 func (testDoerImpl) Do() string { return "done" }
 
-type testGreeter interface{ Greet() string }
-type testGreeterA struct{}
-type testGreeterB struct{}
+type (
+	testGreeter  interface{ Greet() string }
+	testGreeterA struct{}
+	testGreeterB struct{}
+)
 
 func (testGreeterA) Greet() string { return "hello-a" }
 func (testGreeterB) Greet() string { return "hello-b" }
@@ -340,8 +344,10 @@ func TestResolveByInterface_CachedAfterFirst(t *testing.T) {
 }
 
 // testSvcA and testSvcB are used in TestBuildPreservesCause to avoid conflicts.
-type testSvcA struct{}
-type testSvcB struct{}
+type (
+	testSvcA struct{}
+	testSvcB struct{}
+)
 
 func TestBuildPreservesCause(t *testing.T) {
 	c := New()

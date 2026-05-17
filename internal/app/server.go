@@ -68,7 +68,8 @@ func retryWithPortIncrement(addr string, serveFunc func(string) error, log logge
 	for attempt := 0; attempt <= maxPortRetries; attempt++ {
 		if attempt > 0 {
 			if log != nil {
-				log.Warn("Port already in use, trying next port",
+				log.Warn(
+					"Port already in use, trying next port",
 					logger.Field{Key: "attempt", Value: attempt},
 					logger.Field{Key: "addr", Value: currentAddr},
 					logger.Field{Key: "last_error", Value: lastErr.Error()},

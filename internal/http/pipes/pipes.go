@@ -129,10 +129,10 @@ const tagRequired = "required"
 // Two-Pass Strategy:
 // 1. First pass: Run normal validation, collect all errors
 // 2. If any "required" errors found:
-//    - Create a copy of the struct
-//    - Replace empty strings with "x" (passes required check)
-//    - Run validation again on the modified struct
-//    - Merge results from both passes
+//   - Create a copy of the struct
+//   - Replace empty strings with "x" (passes required check)
+//   - Run validation again on the modified struct
+//   - Merge results from both passes
 //
 // Trade-offs:
 // - Pro: Users see all validation errors at once

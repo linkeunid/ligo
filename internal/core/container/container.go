@@ -13,13 +13,13 @@ import (
 
 // Container holds registered providers and resolves dependencies.
 type Container struct {
-	mu              sync.RWMutex
-	parent          *Container
-	providers       map[reflect.Type]ProviderEntry
-	cache           sync.Map // map[reflect.Type]any — thread-safe cache for resolved instances
-	locks           sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
-	interfaceCache  sync.Map // map[reflect.Type]reflect.Type — cache interface->concrete mappings
-	logger          logger.Logger
+	mu             sync.RWMutex
+	parent         *Container
+	providers      map[reflect.Type]ProviderEntry
+	cache          sync.Map // map[reflect.Type]any — thread-safe cache for resolved instances
+	locks          sync.Map // map[reflect.Type]*sync.Mutex — per-type lock
+	interfaceCache sync.Map // map[reflect.Type]reflect.Type — cache interface->concrete mappings
+	logger         logger.Logger
 }
 
 // ProviderEntry represents a registered provider in the di.
@@ -155,7 +155,8 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 				// Cache the interface->concrete mapping
 				c.interfaceCache.Store(requestedTyp, typ)
 				if c.logger != nil {
-					c.logger.LogWithContext(logger.ContextDIContainer, "Interface resolved",
+					c.logger.LogWithContext(
+						logger.ContextDIContainer, "Interface resolved",
 						logger.Field{Key: "interface", Value: requestedTyp.String()},
 						logger.Field{Key: "concrete", Value: matchType.String()},
 					)
@@ -241,7 +242,8 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 			if len(depNames) > 0 {
 				deps = strings.Join(depNames, ", ")
 			}
-			c.logger.LogWithContext(logger.ContextDIContainer, "Constructing "+typ.String(),
+			c.logger.LogWithContext(
+				logger.ContextDIContainer, "Constructing "+typ.String(),
 				logger.Field{Key: "deps", Value: deps},
 			)
 		}

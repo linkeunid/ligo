@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/linkeunid/ligo/internal/di"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/core/module"
+	"github.com/linkeunid/ligo/internal/di"
 	errutil "github.com/linkeunid/ligo/internal/errors"
 )
 
@@ -161,7 +161,8 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 			if ctrlName == "" {
 				ctrlName = "controller"
 			}
-			b.logger.LogWithContext(logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
+			b.logger.LogWithContext(
+				logger.ContextRoutes, fmt.Sprintf("%s controller registered", ctrlName),
 				logger.Field{Key: "module", Value: modName},
 			)
 		}
