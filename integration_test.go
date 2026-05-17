@@ -1021,6 +1021,20 @@ func (p *orderedProvider) OnModuleInit() error {
 	return nil
 }
 
+// orderedProviderTwo is a distinct concrete type so the DI container
+// stores both registrations instead of treating them as a type collision.
+type orderedProviderTwo struct {
+	id      string
+	tracker *lifecycleTracker
+}
+
+func (p *orderedProviderTwo) OnModuleInit() error {
+	p.tracker.mu.Lock()
+	defer p.tracker.mu.Unlock()
+	p.tracker.calls = append(p.tracker.calls, "init-"+p.id)
+	return nil
+}
+
 // TestLifecycleHooks tests the full lifecycle hook execution flow.
 func TestLifecycleHooks(t *testing.T) {
 	t.Run("non-HTTP mode executes all hooks", func(t *testing.T) {
@@ -1083,7 +1097,7 @@ func TestLifecycleHooks(t *testing.T) {
 				"test",
 				ligo.Providers(
 					ligo.Value(&orderedProvider{id: "first", tracker: tracker}),
-					ligo.Value(&orderedProvider{id: "second", tracker: tracker}),
+					ligo.Value(&orderedProviderTwo{id: "second", tracker: tracker}),
 				),
 			),
 		)
@@ -1108,21 +1122,20 @@ func TestLifecycleHooks(t *testing.T) {
 		copy(calls, tracker.calls)
 		tracker.mu.Unlock()
 
-		// Should have init-first before init-second
-		foundFirst, foundSecond := false, false
+		// Provider OnInit hooks run in parallel (see
+		// executeProviderHooksParallel in app.go), so we don't assert
+		// ordering here — only that both fired exactly once.
+		var foundFirst, foundSecond int
 		for _, call := range calls {
-			if call == "init-first" {
-				foundFirst = true
-				if foundSecond {
-					t.Error("init-first called after init-second")
-				}
-			}
-			if call == "init-second" {
-				foundSecond = true
+			switch call {
+			case "init-first":
+				foundFirst++
+			case "init-second":
+				foundSecond++
 			}
 		}
-		if !foundFirst || !foundSecond {
-			t.Errorf("missing init calls. Got: %v", calls)
+		if foundFirst != 1 || foundSecond != 1 {
+			t.Errorf("expected one init-first and one init-second, got first=%d second=%d. Calls: %v", foundFirst, foundSecond, calls)
 		}
 	})
 }
