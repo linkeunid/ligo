@@ -37,7 +37,7 @@ type mockController struct {
 }
 
 func (c *mockController) Routes(r Router) {
-	r.Handle("GET", c.path, func(ctx Context) error { return nil })
+	r.Handle("GET", c.path, func(ctx *Context) error { return nil })
 	c.calls.Add(1)
 }
 

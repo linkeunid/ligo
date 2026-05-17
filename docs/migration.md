@@ -12,6 +12,79 @@ This guide helps you migrate your Ligo applications between versions.
 
 ## [Migration Guide: 0.9.x → 0.10.0](#09x-→-0100)
 
+## [Migration Guide: 0.10.x → 0.11.0](#010x-→-0110)
+
+---
+
+## 0.10.x → 0.11.0
+
+One structural change, all migration is mechanical.
+
+### Context reshape (MAJOR-014)
+
+`ligo.Context` is now a **concrete struct** that wraps the new `ligo.Adapter`
+interface, instead of being a 45-method interface. Adapter authors implement
+14 methods; handlers continue calling `ctx.OK(...)`, `ctx.BadRequest(...)`,
+`ctx.QueryInt(...)`, `ctx.Paginated(...)` unchanged.
+
+#### Handler / Middleware / Guard / Pipe / Interceptor / ExceptionFilter
+
+All take `*ligo.Context` (pointer to struct) instead of `ligo.Context`
+(interface):
+
+```go
+// Before
+func (c *UserController) Get(ctx ligo.Context) error { return ctx.OK(user) }
+
+// After
+func (c *UserController) Get(ctx *ligo.Context) error { return ctx.OK(user) }
+```
+
+Method calls on `ctx` are unchanged. Mechanical sed:
+
+```bash
+sed -i -E 's/(\bctx[[:space:]]+)ligo\.Context\b/\1*ligo.Context/g' \
+    $(find . -name '*.go' -not -path './vendor/*')
+```
+
+Review the diff before committing — `RequestContext() context.Context` from
+the stdlib is a different type and must not be touched.
+
+#### Custom adapters
+
+If you wrote a custom HTTP adapter that implemented `Context`, your type now
+implements the new `ligo.Adapter` interface (14 methods). Delete the 28
+response helpers (`OK`, `Created`, `BadRequest`, …, `HTTPVersionNotSupported`)
+and the 3 query helpers (`QueryDefault`, `QueryInt`, `Paginate`) — `*ligo.Context`
+provides them on top of your `JSON`/`String`. Where you dispatched to a
+handler:
+
+```go
+handler(adapter)  →  handler(ligo.NewContext(adapter))
+```
+
+#### Test mocks
+
+Mocks now implement `Adapter`. ligo's own `MockContext` exposes a `Wrap()`
+helper for handler dispatch:
+
+```go
+mock := testing.NewMockContext()
+ctx := mock.Wrap()                          // *ligo.Context wrapping the mock
+handler(ctx)
+assert.Equal(t, 200, mock.LastJSONCode)     // recorders inspect response
+```
+
+If you wrote a custom mock satisfying `Context`, strip the 28 response
+helpers and 3 query helpers — they're now methods on `*ligo.Context`.
+
+### Why
+
+Every adapter previously implemented all 45 methods; 28 were trivial
+forwarders to `JSON`/`String`. The bloat blocked adding a second adapter
+and forced mocks to carry stub state for methods no test drove. The new
+shape is the minimum surface any adapter needs.
+
 ---
 
 ## 0.9.x → 0.10.0

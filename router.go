@@ -46,11 +46,11 @@ const ValidatedBodyKey = http.ValidatedBodyKey
 //
 // Example:
 //
-//	func (c *UserController) Create(ctx ligo.Context) error {
+//	func (c *UserController) Create(ctx *ligo.Context) error {
 //	    input := ligo.ValidatedBody[CreateUserInput](ctx)
 //	    // input is *CreateUserInput, guaranteed non-nil
 //	}
-func ValidatedBody[T any](ctx Context) *T {
+func ValidatedBody[T any](ctx *Context) *T {
 	return http.ValidatedBody[T](ctx)
 }
 
@@ -60,12 +60,12 @@ func ValidatedBody[T any](ctx Context) *T {
 //
 // Example:
 //
-//	func (c *UserController) GetByID(ctx ligo.Context) error {
+//	func (c *UserController) GetByID(ctx *ligo.Context) error {
 //	    id     := ligo.Get[int](ctx, "id")     // set by ParseIntPipe("id")
 //	    active := ligo.Get[bool](ctx, "active") // set by ParseBoolPipe("active")
 //	    uuid   := ligo.Get[string](ctx, "id")   // set by UUIDPipe("id")
 //	}
-func Get[T any](ctx Context, key string) T {
+func Get[T any](ctx *Context, key string) T {
 	return http.Get[T](ctx, key)
 }
 
@@ -199,7 +199,7 @@ func TimeoutInterceptor(timeout time.Duration) Interceptor {
 }
 
 // LoggingInterceptor creates an interceptor that logs request details.
-// Usage: cr.GET("", c.List).Intercept(ligo.LoggingInterceptor(func(start time.Time, ctx Context, err error) { ... }))
-func LoggingInterceptor(logFunc func(start time.Time, ctx Context, err error)) Interceptor {
+// Usage: cr.GET("", c.List).Intercept(ligo.LoggingInterceptor(func(start time.Time, ctx *Context, err error) { ... }))
+func LoggingInterceptor(logFunc func(start time.Time, ctx *Context, err error)) Interceptor {
 	return http.LoggingInterceptor(logFunc)
 }

@@ -18,8 +18,6 @@ import (
 	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
-const errorMsgKey = "error"
-
 // Adapter implements httpifc.Router using Echo v5.
 type Adapter struct {
 	e          *echo.Echo
@@ -110,7 +108,7 @@ func (a *Adapter) Shutdown(ctx context.Context) error {
 // requestScopeMiddleware creates a per-request child container and sets it on the context.
 func (a *Adapter) requestScopeMiddleware() httpifc.Middleware {
 	return func(next httpifc.HandlerFunc) httpifc.HandlerFunc {
-		return func(ctx httpifc.Context) error {
+		return func(ctx *httpifc.Context) error {
 			child := a.container.NewChild()
 			ctx.SetRequestContainer(child)
 			return next(ctx)
@@ -164,9 +162,11 @@ func (g *groupAdapter) Serve(addr string) error {
 func wrapHandlerWithMiddleware(middleware []httpifc.Middleware, handler httpifc.HandlerFunc) echo.HandlerFunc {
 	wrapped := httpifc.ApplyMiddleware(middleware, handler)
 	return func(c *echo.Context) error {
-		return wrapped(newContextAdapter(c))
+		return wrapped(httpifc.NewContext(newContextAdapter(c)))
 	}
 }
+
+var _ httpifc.Adapter = (*contextAdapter)(nil)
 
 type contextAdapter struct {
 	c       *echo.Context
@@ -205,22 +205,8 @@ func (ca *contextAdapter) Query(key string) string {
 	return httpifc.Query(ca.c.Request(), key)
 }
 
-func (ca *contextAdapter) QueryDefault(key, def string) string {
-	return httpifc.QueryDefault(ca.c.Request(), key, def)
-}
-
-func (ca *contextAdapter) QueryInt(key string, def int) int {
-	return httpifc.QueryInt(ca.c.Request(), key, def)
-}
-
 func (ca *contextAdapter) BindQuery(v any) error {
 	return httpifc.BindQuery(ca.c.Request(), v)
-}
-
-func (ca *contextAdapter) Paginate(defaultPerPage, maxPerPage int) httpifc.ListQuery {
-	q := httpifc.ParseListQuery(ca.c.Request())
-	q.Normalize(defaultPerPage, maxPerPage)
-	return q
 }
 
 func (ca *contextAdapter) Bind(v any) error {
@@ -249,124 +235,6 @@ func (ca *contextAdapter) SetRequestContainer(c *di.Container) {
 
 func (ca *contextAdapter) GetRequestContainer() *di.Container {
 	return ca.reqCont
-}
-
-// HTTP response helpers
-
-func (ca *contextAdapter) errorResponse(code int, msg ...string) error {
-	m := http.StatusText(code)
-	if len(msg) > 0 && msg[0] != "" {
-		m = msg[0]
-	}
-	return ca.c.JSON(code, map[string]string{errorMsgKey: m})
-}
-
-func (ca *contextAdapter) OK(v any) error {
-	return ca.c.JSON(http.StatusOK, v)
-}
-
-func (ca *contextAdapter) Created(v any) error {
-	return ca.c.JSON(http.StatusCreated, v)
-}
-
-func (ca *contextAdapter) Accepted(v any) error {
-	return ca.c.JSON(http.StatusAccepted, v)
-}
-
-func (ca *contextAdapter) NoContent() error {
-	return ca.c.String(http.StatusNoContent, "")
-}
-
-func (ca *contextAdapter) List(items any) error {
-	return ca.c.JSON(http.StatusOK, httpifc.NewListResponse(items))
-}
-
-func (ca *contextAdapter) Paginated(items any, page, perPage int, total int64) error {
-	return ca.c.JSON(http.StatusOK, httpifc.NewPageResponse(items, page, perPage, total))
-}
-
-func (ca *contextAdapter) BadRequest(msg ...string) error {
-	return ca.errorResponse(http.StatusBadRequest, msg...)
-}
-
-func (ca *contextAdapter) Unauthorized(msg ...string) error {
-	return ca.errorResponse(http.StatusUnauthorized, msg...)
-}
-
-func (ca *contextAdapter) Forbidden(msg ...string) error {
-	return ca.errorResponse(http.StatusForbidden, msg...)
-}
-
-func (ca *contextAdapter) NotFound(msg ...string) error {
-	return ca.errorResponse(http.StatusNotFound, msg...)
-}
-
-func (ca *contextAdapter) MethodNotAllowed(msg ...string) error {
-	return ca.errorResponse(http.StatusMethodNotAllowed, msg...)
-}
-
-func (ca *contextAdapter) NotAcceptable(msg ...string) error {
-	return ca.errorResponse(http.StatusNotAcceptable, msg...)
-}
-
-func (ca *contextAdapter) RequestTimeout(msg ...string) error {
-	return ca.errorResponse(http.StatusRequestTimeout, msg...)
-}
-
-func (ca *contextAdapter) Conflict(msg ...string) error {
-	return ca.errorResponse(http.StatusConflict, msg...)
-}
-
-func (ca *contextAdapter) Gone(msg ...string) error {
-	return ca.errorResponse(http.StatusGone, msg...)
-}
-
-func (ca *contextAdapter) PreconditionFailed(msg ...string) error {
-	return ca.errorResponse(http.StatusPreconditionFailed, msg...)
-}
-
-func (ca *contextAdapter) PayloadTooLarge(msg ...string) error {
-	return ca.errorResponse(http.StatusRequestEntityTooLarge, msg...)
-}
-
-func (ca *contextAdapter) UnsupportedMediaType(msg ...string) error {
-	return ca.errorResponse(http.StatusUnsupportedMediaType, msg...)
-}
-
-func (ca *contextAdapter) UnprocessableEntity(msg ...string) error {
-	return ca.errorResponse(http.StatusUnprocessableEntity, msg...)
-}
-
-func (ca *contextAdapter) TooManyRequests(msg ...string) error {
-	return ca.errorResponse(http.StatusTooManyRequests, msg...)
-}
-
-func (ca *contextAdapter) ImATeapot(msg ...string) error {
-	return ca.errorResponse(http.StatusTeapot, msg...)
-}
-
-func (ca *contextAdapter) InternalServerError(msg ...string) error {
-	return ca.errorResponse(http.StatusInternalServerError, msg...)
-}
-
-func (ca *contextAdapter) NotImplemented(msg ...string) error {
-	return ca.errorResponse(http.StatusNotImplemented, msg...)
-}
-
-func (ca *contextAdapter) BadGateway(msg ...string) error {
-	return ca.errorResponse(http.StatusBadGateway, msg...)
-}
-
-func (ca *contextAdapter) ServiceUnavailable(msg ...string) error {
-	return ca.errorResponse(http.StatusServiceUnavailable, msg...)
-}
-
-func (ca *contextAdapter) GatewayTimeout(msg ...string) error {
-	return ca.errorResponse(http.StatusGatewayTimeout, msg...)
-}
-
-func (ca *contextAdapter) HTTPVersionNotSupported(msg ...string) error {
-	return ca.errorResponse(http.StatusHTTPVersionNotSupported, msg...)
 }
 
 func (ca *contextAdapter) Stream(reader io.Reader) error {

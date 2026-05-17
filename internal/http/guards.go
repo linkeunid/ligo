@@ -17,7 +17,7 @@ type HasRole = guards.HasRole
 // Usage: Guard(RolesGuard("user", "admin"))
 func RolesGuard(contextKey string, requiredRoles ...string) Guard {
 	g := guards.RolesGuard(contextKey, requiredRoles...)
-	return func(ctx Context) (bool, error) {
+	return func(ctx *Context) (bool, error) {
 		return g(ctx)
 	}
 }
@@ -29,7 +29,7 @@ func RolesGuard(contextKey string, requiredRoles ...string) Guard {
 // Usage: Guard(ThrottleGuard("ip", 10, time.Minute))
 func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) Guard {
 	g := guards.ThrottleGuard(identifierKey, maxRequests, window)
-	return func(ctx Context) (bool, error) {
+	return func(ctx *Context) (bool, error) {
 		return g(ctx)
 	}
 }
@@ -37,7 +37,7 @@ func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) 
 // AdminGuard is a convenience guard that checks for admin role.
 func AdminGuard(contextKey string) Guard {
 	g := guards.AdminGuard(contextKey)
-	return func(ctx Context) (bool, error) {
+	return func(ctx *Context) (bool, error) {
 		return g(ctx)
 	}
 }

@@ -14,72 +14,40 @@ import (
 	"github.com/linkeunid/ligo/internal/di"
 )
 
-// timeoutMockContext is a minimal Context for interceptor tests. We deliberately
+// timeoutMockAdapter is a minimal Adapter for interceptor tests. We deliberately
 // do not embed mockBindContext (from pipes_test) — these tests only need
 // Request/RequestContext and the request-container plumbing.
-type timeoutMockContext struct {
+type timeoutMockAdapter struct {
 	req    *nethttp.Request
 	reqCtx context.Context
 	cont   *di.Container
 }
 
-func (m *timeoutMockContext) Request() *nethttp.Request          { return m.req }
-func (m *timeoutMockContext) Response() nethttp.ResponseWriter   { return nil }
-func (m *timeoutMockContext) RequestContext() context.Context    { return m.reqCtx }
-func (m *timeoutMockContext) Param(string) string                { return "" }
-func (m *timeoutMockContext) Query(string) string                { return "" }
-func (m *timeoutMockContext) QueryDefault(_, def string) string  { return def }
-func (m *timeoutMockContext) QueryInt(_ string, def int) int     { return def }
-func (m *timeoutMockContext) BindQuery(any) error                { return nil }
-func (m *timeoutMockContext) Paginate(_, _ int) ListQuery        { return ListQuery{} }
-func (m *timeoutMockContext) Bind(any) error                     { return nil }
-func (m *timeoutMockContext) JSON(int, any) error                { return nil }
-func (m *timeoutMockContext) String(int, string) error           { return nil }
-func (m *timeoutMockContext) Set(string, any)                    {}
-func (m *timeoutMockContext) Get(string) any                     { return nil }
-func (m *timeoutMockContext) SetRequestContainer(*di.Container)  {}
-func (m *timeoutMockContext) GetRequestContainer() *di.Container { return m.cont }
-func (m *timeoutMockContext) OK(any) error                       { return nil }
-func (m *timeoutMockContext) Created(any) error                  { return nil }
-func (m *timeoutMockContext) Accepted(any) error                 { return nil }
-func (m *timeoutMockContext) NoContent() error                   { return nil }
-func (m *timeoutMockContext) List(any) error                     { return nil }
-func (m *timeoutMockContext) Paginated(any, int, int, int64) error {
-	return nil
-}
-func (m *timeoutMockContext) BadRequest(...string) error              { return nil }
-func (m *timeoutMockContext) Unauthorized(...string) error            { return nil }
-func (m *timeoutMockContext) Forbidden(...string) error               { return nil }
-func (m *timeoutMockContext) NotFound(...string) error                { return nil }
-func (m *timeoutMockContext) MethodNotAllowed(...string) error        { return nil }
-func (m *timeoutMockContext) NotAcceptable(...string) error           { return nil }
-func (m *timeoutMockContext) RequestTimeout(...string) error          { return nil }
-func (m *timeoutMockContext) Conflict(...string) error                { return nil }
-func (m *timeoutMockContext) Gone(...string) error                    { return nil }
-func (m *timeoutMockContext) PreconditionFailed(...string) error      { return nil }
-func (m *timeoutMockContext) PayloadTooLarge(...string) error         { return nil }
-func (m *timeoutMockContext) UnsupportedMediaType(...string) error    { return nil }
-func (m *timeoutMockContext) UnprocessableEntity(...string) error     { return nil }
-func (m *timeoutMockContext) TooManyRequests(...string) error         { return nil }
-func (m *timeoutMockContext) ImATeapot(...string) error               { return nil }
-func (m *timeoutMockContext) InternalServerError(...string) error     { return nil }
-func (m *timeoutMockContext) NotImplemented(...string) error          { return nil }
-func (m *timeoutMockContext) BadGateway(...string) error              { return nil }
-func (m *timeoutMockContext) ServiceUnavailable(...string) error      { return nil }
-func (m *timeoutMockContext) GatewayTimeout(...string) error          { return nil }
-func (m *timeoutMockContext) HTTPVersionNotSupported(...string) error { return nil }
-func (m *timeoutMockContext) Stream(io.Reader) error                  { return nil }
+func (m *timeoutMockAdapter) Request() *nethttp.Request          { return m.req }
+func (m *timeoutMockAdapter) Response() nethttp.ResponseWriter   { return nil }
+func (m *timeoutMockAdapter) RequestContext() context.Context    { return m.reqCtx }
+func (m *timeoutMockAdapter) Param(string) string                { return "" }
+func (m *timeoutMockAdapter) Query(string) string                { return "" }
+func (m *timeoutMockAdapter) BindQuery(any) error                { return nil }
+func (m *timeoutMockAdapter) Bind(any) error                     { return nil }
+func (m *timeoutMockAdapter) JSON(int, any) error                { return nil }
+func (m *timeoutMockAdapter) String(int, string) error           { return nil }
+func (m *timeoutMockAdapter) Set(string, any)                    {}
+func (m *timeoutMockAdapter) Get(string) any                     { return nil }
+func (m *timeoutMockAdapter) SetRequestContainer(*di.Container)  {}
+func (m *timeoutMockAdapter) GetRequestContainer() *di.Container { return m.cont }
+func (m *timeoutMockAdapter) Stream(io.Reader) error             { return nil }
 
-func newTimeoutCtx(parent context.Context) *timeoutMockContext {
+func newTimeoutCtx(parent context.Context) *Context {
 	req := httptest.NewRequest("GET", "/", nil).WithContext(parent)
-	return &timeoutMockContext{req: req, reqCtx: parent}
+	return NewContext(&timeoutMockAdapter{req: req, reqCtx: parent})
 }
 
 func TestTimeoutInterceptor_ReturnsTimeoutErrorOnSlowHandler(t *testing.T) {
 	i := TimeoutInterceptor(50 * time.Millisecond)
 	ctx := newTimeoutCtx(context.Background())
 
-	err := i(ctx, func(Context) error {
+	err := i(ctx, func(*Context) error {
 		time.Sleep(200 * time.Millisecond)
 		return nil
 	})
@@ -97,7 +65,7 @@ func TestTimeoutInterceptor_HandlerSeesCancelledContext(t *testing.T) {
 	ctx := newTimeoutCtx(context.Background())
 
 	var cancelled atomic.Bool
-	_ = i(ctx, func(c Context) error {
+	_ = i(ctx, func(c *Context) error {
 		select {
 		case <-c.RequestContext().Done():
 			cancelled.Store(true)
@@ -126,7 +94,7 @@ func TestTimeoutInterceptor_PropagatesParentCancellation(t *testing.T) {
 
 	cancelObserved := make(chan struct{})
 	go func() {
-		_ = i(ctx, func(c Context) error {
+		_ = i(ctx, func(c *Context) error {
 			<-c.RequestContext().Done()
 			close(cancelObserved)
 			return c.RequestContext().Err()
@@ -148,7 +116,7 @@ func TestTimeoutInterceptor_HandlerReturnsNormallyWhenFast(t *testing.T) {
 	ctx := newTimeoutCtx(context.Background())
 
 	want := errors.New("handler error")
-	err := i(ctx, func(Context) error { return want })
+	err := i(ctx, func(*Context) error { return want })
 
 	if !errors.Is(err, want) {
 		t.Errorf("expected handler error, got %v", err)

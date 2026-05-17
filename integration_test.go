@@ -320,7 +320,7 @@ func (c *diController) Routes(r ligo.Router) {
 	r.Handle("GET", "/di-test", c.getDI)
 }
 
-func (c *diController) getDI(ctx ligo.Context) error {
+func (c *diController) getDI(ctx *ligo.Context) error {
 	return ctx.OK(map[string]string{"message": c.service.message})
 }
 
@@ -568,7 +568,7 @@ type simpleController struct {
 
 func (c *simpleController) Routes(r ligo.Router) {
 	c.called.Store(true)
-	r.Handle("GET", "/test", func(ctx ligo.Context) error {
+	r.Handle("GET", "/test", func(ctx *ligo.Context) error {
 		return ctx.OK(map[string]string{"status": "ok"})
 	})
 }
@@ -578,7 +578,7 @@ func TestMiddleware(t *testing.T) {
 	var middlewareCalled atomic.Bool
 
 	testMiddleware := func(next ligo.HandlerFunc) ligo.HandlerFunc {
-		return func(ctx ligo.Context) error {
+		return func(ctx *ligo.Context) error {
 			middlewareCalled.Store(true)
 			return next(ctx)
 		}
@@ -870,7 +870,7 @@ type importedController struct {
 }
 
 func (c *importedController) Routes(r ligo.Router) {
-	r.Handle("GET", c.path, func(ctx ligo.Context) error { return ctx.OK("ok") })
+	r.Handle("GET", c.path, func(ctx *ligo.Context) error { return ctx.OK("ok") })
 	c.calls.Add(1)
 }
 

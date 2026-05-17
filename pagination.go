@@ -37,7 +37,7 @@ func NewPageResponse(items any, page, perPage int, total int64) PageResponse {
 //
 // Example:
 //
-//	func (c *UserController) List(ctx ligo.Context) error {
+//	func (c *UserController) List(ctx *ligo.Context) error {
 //	    q := ligo.ParseListQuery(ctx.Request())
 //	    q.Normalize(20, 100) // default 20, max 100
 //	    users, total, err := c.repo.FindPage(ctx.Request().Context(), q.PerPage, q.Offset())

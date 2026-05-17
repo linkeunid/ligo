@@ -2,14 +2,9 @@ package testing
 
 import (
 	"errors"
+	"strings"
 	"testing"
-
-	httpifc "github.com/linkeunid/ligo/internal/http"
 )
-
-// Compile-time check duplicates the one in mocks.go but keeps it visible from
-// tests so a CI change cannot delete the assertion silently.
-var _ httpifc.Context = (*MockContext)(nil)
 
 type bindTarget struct {
 	Name string `json:"name"`
@@ -75,13 +70,6 @@ func TestMockContext_BindQueryReturnsInjectedError(t *testing.T) {
 	}
 }
 
-func TestMockContext_ImATeapotReturnsNil(t *testing.T) {
-	m := NewMockContext()
-	if err := m.ImATeapot("yes"); err != nil {
-		t.Errorf("expected nil, got %v", err)
-	}
-}
-
 func TestMockContext_RequestAndResponseDefaults(t *testing.T) {
 	m := NewMockContext()
 	if m.Request() == nil {
@@ -102,17 +90,11 @@ func TestMockContext_Param(t *testing.T) {
 	}
 }
 
-func TestMockContext_QueryHelpers(t *testing.T) {
+func TestMockContext_Query(t *testing.T) {
 	m := NewMockContext()
-	// Default request is GET / — no query. Helpers must return defaults.
+	// Default request is GET / — no query.
 	if got := m.Query("k"); got != "" {
 		t.Errorf("Query missing = %q", got)
-	}
-	if got := m.QueryDefault("k", "fallback"); got != "fallback" {
-		t.Errorf("QueryDefault = %q", got)
-	}
-	if got := m.QueryInt("k", 7); got != 7 {
-		t.Errorf("QueryInt = %d", got)
 	}
 }
 
@@ -124,59 +106,6 @@ func TestMockContext_SetGet(t *testing.T) {
 	}
 	if got := m.Get("missing"); got != nil {
 		t.Errorf("Get missing = %v", got)
-	}
-}
-
-func TestMockContext_AllResponseHelpersReturnNil(t *testing.T) {
-	m := NewMockContext()
-	// Sweep every response helper to lock in the no-op contract.
-	checks := []struct {
-		name string
-		fn   func() error
-	}{
-		{"OK", func() error { return m.OK(nil) }},
-		{"Created", func() error { return m.Created(nil) }},
-		{"Accepted", func() error { return m.Accepted(nil) }},
-		{"NoContent", m.NoContent},
-		{"List", func() error { return m.List(nil) }},
-		{"Paginated", func() error { return m.Paginated(nil, 1, 10, 0) }},
-		{"JSON", func() error { return m.JSON(200, nil) }},
-		{"String", func() error { return m.String(200, "") }},
-		{"BadRequest", func() error { return m.BadRequest() }},
-		{"Unauthorized", func() error { return m.Unauthorized() }},
-		{"Forbidden", func() error { return m.Forbidden() }},
-		{"NotFound", func() error { return m.NotFound() }},
-		{"MethodNotAllowed", func() error { return m.MethodNotAllowed() }},
-		{"NotAcceptable", func() error { return m.NotAcceptable() }},
-		{"RequestTimeout", func() error { return m.RequestTimeout() }},
-		{"Conflict", func() error { return m.Conflict() }},
-		{"Gone", func() error { return m.Gone() }},
-		{"PreconditionFailed", func() error { return m.PreconditionFailed() }},
-		{"PayloadTooLarge", func() error { return m.PayloadTooLarge() }},
-		{"UnsupportedMediaType", func() error { return m.UnsupportedMediaType() }},
-		{"UnprocessableEntity", func() error { return m.UnprocessableEntity() }},
-		{"TooManyRequests", func() error { return m.TooManyRequests() }},
-		{"InternalServerError", func() error { return m.InternalServerError() }},
-		{"NotImplemented", func() error { return m.NotImplemented() }},
-		{"BadGateway", func() error { return m.BadGateway() }},
-		{"ServiceUnavailable", func() error { return m.ServiceUnavailable() }},
-		{"GatewayTimeout", func() error { return m.GatewayTimeout() }},
-		{"HTTPVersionNotSupported", func() error { return m.HTTPVersionNotSupported() }},
-		{"Stream", func() error { return m.Stream(nil) }},
-	}
-	for _, c := range checks {
-		if err := c.fn(); err != nil {
-			t.Errorf("%s = %v, want nil", c.name, err)
-		}
-	}
-}
-
-func TestMockContext_Paginate(t *testing.T) {
-	m := NewMockContext()
-	q := m.Paginate(10, 100)
-	// Defaults should be normalized: per_page absent → default 10.
-	if q.PerPage != 10 {
-		t.Errorf("PerPage = %d, want 10", q.PerPage)
 	}
 }
 
@@ -197,5 +126,51 @@ func TestMockLogger_AllLevels(t *testing.T) {
 	l.Clear()
 	if len(l.GetLogs()) != 0 {
 		t.Error("Clear did not empty logs")
+	}
+}
+
+func TestMockContext_RecordsJSON(t *testing.T) {
+	m := NewMockContext()
+	body := map[string]string{"hello": "world"}
+	if err := m.JSON(201, body); err != nil {
+		t.Fatalf("JSON returned error: %v", err)
+	}
+	if m.LastJSONCode != 201 {
+		t.Errorf("expected code 201, got %d", m.LastJSONCode)
+	}
+	got, ok := m.LastJSONBody.(map[string]string)
+	if !ok || got["hello"] != "world" {
+		t.Errorf("body not recorded: %#v", m.LastJSONBody)
+	}
+}
+
+func TestMockContext_RecordsString(t *testing.T) {
+	m := NewMockContext()
+	if err := m.String(204, "no content"); err != nil {
+		t.Fatalf("String returned error: %v", err)
+	}
+	if m.LastStringCode != 204 {
+		t.Errorf("expected code 204, got %d", m.LastStringCode)
+	}
+	if m.LastStringBody != "no content" {
+		t.Errorf("body not recorded: %q", m.LastStringBody)
+	}
+}
+
+func TestMockContext_RecordsStream(t *testing.T) {
+	m := NewMockContext()
+	if err := m.Stream(strings.NewReader("payload")); err != nil {
+		t.Fatalf("Stream returned error: %v", err)
+	}
+	if m.LastStreamBody != "payload" {
+		t.Errorf("stream body not recorded: %q", m.LastStreamBody)
+	}
+}
+
+func TestMockContext_JSONReturnsInjectedError(t *testing.T) {
+	m := NewMockContext()
+	m.JSONErr = errors.New("boom")
+	if err := m.JSON(200, nil); err == nil || err.Error() != "boom" {
+		t.Errorf("expected injected error, got %v", err)
 	}
 }

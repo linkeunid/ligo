@@ -23,7 +23,7 @@ import (
 //
 // Usage: Intercept(TimeoutInterceptor(5 * time.Second))
 func TimeoutInterceptor(timeout time.Duration) Interceptor {
-	return func(ctx Context, next HandlerFunc) error {
+	return func(ctx *Context, next HandlerFunc) error {
 		parent := ctx.RequestContext()
 		if parent == nil {
 			parent = context.Background()
@@ -31,11 +31,11 @@ func TimeoutInterceptor(timeout time.Duration) Interceptor {
 		timeoutCtx, cancel := context.WithTimeout(parent, timeout)
 		defer cancel()
 
-		wrapped := &timeoutContextWrapper{
-			Context: ctx,
+		wrapped := NewContext(&timeoutAdapter{
+			Adapter: ctx.Adapter,
 			req:     ctx.Request().WithContext(timeoutCtx),
 			reqCtx:  timeoutCtx,
-		}
+		})
 
 		done := make(chan error, 1)
 		go func() { done <- next(wrapped) }()
@@ -49,23 +49,23 @@ func TimeoutInterceptor(timeout time.Duration) Interceptor {
 	}
 }
 
-// timeoutContextWrapper overrides Request and RequestContext to expose the
+// timeoutAdapter overrides Request and RequestContext to expose the
 // timeout-bound context to the handler while delegating everything else to
-// the underlying Context.
-type timeoutContextWrapper struct {
-	Context
+// the underlying Adapter.
+type timeoutAdapter struct {
+	Adapter
 	req    *http.Request
 	reqCtx context.Context
 }
 
-func (w *timeoutContextWrapper) Request() *http.Request          { return w.req }
-func (w *timeoutContextWrapper) RequestContext() context.Context { return w.reqCtx }
+func (w *timeoutAdapter) Request() *http.Request          { return w.req }
+func (w *timeoutAdapter) RequestContext() context.Context { return w.reqCtx }
 
 // LoggingInterceptor creates an interceptor that logs request details.
 // The logFunc callback receives the start time, context, and any error.
-// Usage: Intercept(LoggingInterceptor(func(start time.Time, ctx Context, err error) { ... }))
-func LoggingInterceptor(logFunc func(start time.Time, ctx Context, err error)) Interceptor {
-	return func(ctx Context, next HandlerFunc) error {
+// Usage: Intercept(LoggingInterceptor(func(start time.Time, ctx *Context, err error) { ... }))
+func LoggingInterceptor(logFunc func(start time.Time, ctx *Context, err error)) Interceptor {
+	return func(ctx *Context, next HandlerFunc) error {
 		start := time.Now()
 		err := next(ctx)
 		if logFunc != nil {

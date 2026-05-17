@@ -23,7 +23,7 @@ func TestAdapterGroup(t *testing.T) {
 func TestAdapterHandle(t *testing.T) {
 	a := NewAdapter()
 	called := false
-	a.Handle("GET", "/test", func(ctx httpifc.Context) error {
+	a.Handle("GET", "/test", func(ctx *httpifc.Context) error {
 		called = true
 		return ctx.String(200, "ok")
 	})

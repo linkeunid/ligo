@@ -42,7 +42,7 @@ func BenchmarkLigoModuleCreation(b *testing.B) {
 // BenchmarkLigoModuleWithMiddleware benchmarks module creation with middleware.
 func BenchmarkLigoModuleWithMiddleware(b *testing.B) {
 	testMiddleware := func(next ligo.HandlerFunc) ligo.HandlerFunc {
-		return func(ctx ligo.Context) error {
+		return func(ctx *ligo.Context) error {
 			return next(ctx)
 		}
 	}
@@ -258,7 +258,7 @@ func BenchmarkLigoWithMultipleOptions(b *testing.B) {
 	router := echo.NewAdapter()
 
 	testMiddleware := func(next ligo.HandlerFunc) ligo.HandlerFunc {
-		return func(ctx ligo.Context) error {
+		return func(ctx *ligo.Context) error {
 			return next(ctx)
 		}
 	}
@@ -287,7 +287,7 @@ func (c *benchController) Routes(r ligo.Router) {
 	cr.GET("/test", c.getTest).Handle()
 }
 
-func (c *benchController) getTest(ctx ligo.Context) error {
+func (c *benchController) getTest(ctx *ligo.Context) error {
 	return ctx.OK(map[string]string{"status": "ok"})
 }
 

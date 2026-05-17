@@ -172,6 +172,7 @@ The TimeoutInterceptor defect (BLOCKER-004) and the never-Put context pool (BLOC
 - **Description:** `Context` defines ~40 methods, including 23 HTTP status helpers (`OK/Created/.../HTTPVersionNotSupported`). Every adapter must implement all 23 plus `Stream(reader any)`. Blocks the "second adapter validates the abstraction" recommendation and obscures the minimal surface.
 - **Suggested fix:** Keep a small adapter contract on `Context` (Request/Response/Param/Query/Bind/Set/Get/JSON/String/NoContent/Stream). Move the 22 status helpers to package-level functions taking `Context` (`ligo.BadRequest(ctx, msg)`), or a thin helper struct.
 - **Effort:** L
+- **Status:** Done in v0.11.0 — `Context` is now a concrete struct embedding the new 14-method `Adapter` interface; 28 response helpers + 3 query helpers live as methods on `*Context`. Handlers receive `*ligo.Context`; `ctx.OK(...)` etc. unchanged.
 
 ### [MAJOR-015] http-context-stream-any
 - **File:** `internal/http/context.go:82`

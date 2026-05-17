@@ -39,7 +39,7 @@ func TestChainRouter_VerbsBuildRoutes(t *testing.T) {
 			mock.handleFunc = func(method, _ string, _ HandlerFunc) { captured = method }
 
 			cr := NewChainRouter(mock)
-			v.fn(cr).Handle(func(Context) error { return nil })
+			v.fn(cr).Handle(func(*Context) error { return nil })
 
 			if captured != v.method {
 				t.Errorf("method = %q, want %q", captured, v.method)

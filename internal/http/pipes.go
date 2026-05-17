@@ -14,7 +14,7 @@ import (
 //	input := ligo.ValidatedBody[CreateUserInput](ctx)
 func ValidationPipe[T any](v *T) Pipe {
 	p := pipes.ValidationPipe(v)
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		return p(ctx)
 	}
 }
@@ -23,7 +23,7 @@ func ValidationPipe[T any](v *T) Pipe {
 // Panics with a clear message if ValidationPipe was not added to the route.
 //
 //	input := ligo.ValidatedBody[CreateUserInput](ctx)
-func ValidatedBody[T any](ctx Context) *T {
+func ValidatedBody[T any](ctx *Context) *T {
 	return pipes.ValidatedBody[T](ctx)
 }
 
@@ -34,7 +34,7 @@ func ValidatedBody[T any](ctx Context) *T {
 //	id   := ligo.Get[int](ctx, "id")     // set by ParseIntPipe("id")
 //	ok   := ligo.Get[bool](ctx, "active") // set by ParseBoolPipe("active")
 //	uuid := ligo.Get[string](ctx, "id")   // set by UUIDPipe("id")
-func Get[T any](ctx Context, key string) T {
+func Get[T any](ctx *Context, key string) T {
 	v, _ := ctx.Get(key).(T)
 	return v
 }
@@ -43,7 +43,7 @@ func Get[T any](ctx Context, key string) T {
 // result in ctx under param's name.
 func ParseIntPipe(param string) Pipe {
 	p := pipes.ParseIntPipe(param)
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		return p(ctx)
 	}
 }
@@ -53,7 +53,7 @@ func ParseIntPipe(param string) Pipe {
 // Accepts: 1, t, T, TRUE, true, True / 0, f, F, FALSE, false, False.
 func ParseBoolPipe(param string) Pipe {
 	p := pipes.ParseBoolPipe(param)
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		return p(ctx)
 	}
 }
@@ -62,7 +62,7 @@ func ParseBoolPipe(param string) Pipe {
 // in ctx under param's name.
 func UUIDPipe(param string) Pipe {
 	p := pipes.UUIDPipe(param)
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		return p(ctx)
 	}
 }
@@ -71,7 +71,7 @@ func UUIDPipe(param string) Pipe {
 // and stores the trimmed value in ctx under param's name.
 func TrimPipe(param string) Pipe {
 	p := pipes.TrimPipe(param)
-	return func(ctx Context) error {
+	return func(ctx *Context) error {
 		return p(ctx)
 	}
 }

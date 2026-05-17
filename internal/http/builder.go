@@ -96,7 +96,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 	for i := len(rb.interceptors) - 1; i >= 0; i-- {
 		interceptor := rb.interceptors[i]
 		prev := wrapped
-		wrapped = func(ctx Context) error {
+		wrapped = func(ctx *Context) error {
 			return interceptor(ctx, prev)
 		}
 	}
@@ -104,7 +104,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 	// Apply pipes (validate/transform request data)
 	if len(rb.pipes) > 0 {
 		prev := wrapped
-		wrapped = func(ctx Context) error {
+		wrapped = func(ctx *Context) error {
 			for _, pipe := range rb.pipes {
 				if err := pipe(ctx); err != nil {
 					return err
@@ -117,7 +117,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 	// Apply guards (authorization check)
 	if len(rb.guards) > 0 {
 		prev := wrapped
-		wrapped = func(ctx Context) error {
+		wrapped = func(ctx *Context) error {
 			for _, guard := range rb.guards {
 				allowed, err := guard(ctx)
 				if err != nil {
@@ -137,7 +137,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 	// Wrap with exception filters
 	finalHandler := wrapped
 	if len(rb.exceptionFilters) > 0 {
-		finalHandler = func(ctx Context) error {
+		finalHandler = func(ctx *Context) error {
 			err := wrapped(ctx)
 			if err != nil {
 				// Apply exception filters in order

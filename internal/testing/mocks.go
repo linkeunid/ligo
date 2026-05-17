@@ -7,24 +7,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strconv"
 
 	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/di"
 	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
-// Compile-time assertion that MockContext satisfies the Context interface.
-// If the interface drifts, this fails the build instead of failing silently
-// the moment a test tries to use MockContext as a Context.
-var _ httpifc.Context = (*MockContext)(nil)
-
-// MockContext is a mock implementation of ligo.Context for testing.
+// MockContext is a mock Adapter implementation used by tests.
 //
 // Bind/BindQuery defaults are no-ops. To drive realistic binding in tests:
 //   - SetBody(v) stashes a value that Bind copies into its target via reflect.
 //   - SetQueryBody(v) does the same for BindQuery.
 //   - WithBindError(err) / WithBindQueryError(err) inject failures.
+//
+// Wrap returns a *httpifc.Context backed by this MockContext for tests
+// that need to invoke a HandlerFunc / Pipe / Guard.
 type MockContext struct {
 	values        map[string]any
 	req           *http.Request
@@ -34,6 +31,20 @@ type MockContext struct {
 	bindErr       error
 	bindQueryBody any
 	bindQueryErr  error
+
+	// LastJSONCode/LastJSONBody record the most recent JSON call.
+	LastJSONCode int
+	LastJSONBody any
+	JSONErr      error
+
+	// LastStringCode/LastStringBody record the most recent String call.
+	LastStringCode int
+	LastStringBody string
+	StringErr      error
+
+	// LastStreamBody captures bytes passed to Stream (read via io.ReadAll).
+	LastStreamBody string
+	StreamErr      error
 }
 
 // NewMockContext creates a new mock context for testing.
@@ -44,6 +55,16 @@ func NewMockContext() *MockContext {
 		resp:   httptest.NewRecorder(),
 	}
 }
+
+// Wrap returns a *Context whose Adapter is this MockContext. Use this
+// when calling a HandlerFunc / Pipe / Guard that expects *Context.
+func (m *MockContext) Wrap() *httpifc.Context {
+	return httpifc.NewContext(m)
+}
+
+// SetRequest replaces the embedded request. Useful for tests that need
+// to drive query/body parsing through the helper methods on *Context.
+func (m *MockContext) SetRequest(r *http.Request) { m.req = r }
 
 // Request returns the mock HTTP request.
 func (m *MockContext) Request() *http.Request {
@@ -74,27 +95,6 @@ func (m *MockContext) Query(key string) string {
 		return ""
 	}
 	return m.req.URL.Query().Get(key)
-}
-
-// QueryDefault delegates to the mock request's URL.Query with a fallback.
-func (m *MockContext) QueryDefault(key, def string) string {
-	if v := m.Query(key); v != "" {
-		return v
-	}
-	return def
-}
-
-// QueryInt parses a query value as int with a fallback default.
-func (m *MockContext) QueryInt(key string, def int) int {
-	v := m.Query(key)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return def
-	}
-	return n
 }
 
 // BindQuery copies the stashed query body (see SetQueryBody) into v, or
@@ -142,17 +142,6 @@ func copyInto(dst, src any) error {
 	return json.Unmarshal(b, dst)
 }
 
-// Paginate returns a zero-value ListQuery; tests can swap the request to
-// drive realistic pagination behavior.
-func (m *MockContext) Paginate(defaultPerPage, maxPerPage int) httpifc.ListQuery {
-	if m.req == nil {
-		return httpifc.ListQuery{}
-	}
-	q := httpifc.ParseListQuery(m.req)
-	q.Normalize(defaultPerPage, maxPerPage)
-	return q
-}
-
 // Bind copies the stashed body (see SetBody) into v, or returns the
 // injected error (see WithBindError). With neither set, it is a no-op for
 // backwards compatibility.
@@ -166,14 +155,18 @@ func (m *MockContext) Bind(v any) error {
 	return nil
 }
 
-// JSON is a mock implementation that always returns nil.
+// JSON records the call and returns m.JSONErr.
 func (m *MockContext) JSON(code int, v any) error {
-	return nil
+	m.LastJSONCode = code
+	m.LastJSONBody = v
+	return m.JSONErr
 }
 
-// String is a mock implementation that always returns nil.
+// String records the call and returns m.StringErr.
 func (m *MockContext) String(code int, s string) error {
-	return nil
+	m.LastStringCode = code
+	m.LastStringBody = s
+	return m.StringErr
 }
 
 // Set stores a value in the mock context.
@@ -196,36 +189,17 @@ func (m *MockContext) GetRequestContainer() *di.Container {
 	return m.reqCont
 }
 
-// HTTP response helpers (mock implementations)
-
-func (m *MockContext) OK(v any) error                                            { return nil }
-func (m *MockContext) Created(v any) error                                       { return nil }
-func (m *MockContext) Accepted(v any) error                                      { return nil }
-func (m *MockContext) NoContent() error                                          { return nil }
-func (m *MockContext) List(items any) error                                      { return nil }
-func (m *MockContext) Paginated(items any, page, perPage int, total int64) error { return nil }
-func (m *MockContext) BadRequest(msg ...string) error                            { return nil }
-func (m *MockContext) Unauthorized(msg ...string) error                          { return nil }
-func (m *MockContext) Forbidden(msg ...string) error                             { return nil }
-func (m *MockContext) NotFound(msg ...string) error                              { return nil }
-func (m *MockContext) MethodNotAllowed(msg ...string) error                      { return nil }
-func (m *MockContext) NotAcceptable(msg ...string) error                         { return nil }
-func (m *MockContext) RequestTimeout(msg ...string) error                        { return nil }
-func (m *MockContext) Conflict(msg ...string) error                              { return nil }
-func (m *MockContext) Gone(msg ...string) error                                  { return nil }
-func (m *MockContext) PreconditionFailed(msg ...string) error                    { return nil }
-func (m *MockContext) PayloadTooLarge(msg ...string) error                       { return nil }
-func (m *MockContext) UnsupportedMediaType(msg ...string) error                  { return nil }
-func (m *MockContext) UnprocessableEntity(msg ...string) error                   { return nil }
-func (m *MockContext) TooManyRequests(msg ...string) error                       { return nil }
-func (m *MockContext) ImATeapot(msg ...string) error                             { return nil }
-func (m *MockContext) InternalServerError(msg ...string) error                   { return nil }
-func (m *MockContext) NotImplemented(msg ...string) error                        { return nil }
-func (m *MockContext) BadGateway(msg ...string) error                            { return nil }
-func (m *MockContext) ServiceUnavailable(msg ...string) error                    { return nil }
-func (m *MockContext) GatewayTimeout(msg ...string) error                        { return nil }
-func (m *MockContext) HTTPVersionNotSupported(msg ...string) error               { return nil }
-func (m *MockContext) Stream(reader io.Reader) error                             { return nil }
+// Stream records the bytes from reader and returns m.StreamErr.
+func (m *MockContext) Stream(reader io.Reader) error {
+	if reader != nil {
+		b, err := io.ReadAll(reader)
+		if err != nil {
+			return err
+		}
+		m.LastStreamBody = string(b)
+	}
+	return m.StreamErr
+}
 
 // MockLogger is a mock implementation of logger.Logger for testing.
 type MockLogger struct {
