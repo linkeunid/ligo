@@ -76,7 +76,7 @@ func newTimeoutCtx(parent context.Context) *timeoutMockContext {
 }
 
 func TestTimeoutInterceptor_ReturnsTimeoutErrorOnSlowHandler(t *testing.T) {
-	i := TimeoutInterceptor(20 * time.Millisecond)
+	i := TimeoutInterceptor(50 * time.Millisecond)
 	ctx := newTimeoutCtx(context.Background())
 
 	err := i(ctx, func(Context) error {
@@ -93,7 +93,7 @@ func TestTimeoutInterceptor_ReturnsTimeoutErrorOnSlowHandler(t *testing.T) {
 }
 
 func TestTimeoutInterceptor_HandlerSeesCancelledContext(t *testing.T) {
-	i := TimeoutInterceptor(20 * time.Millisecond)
+	i := TimeoutInterceptor(50 * time.Millisecond)
 	ctx := newTimeoutCtx(context.Background())
 
 	var cancelled atomic.Bool
@@ -102,11 +102,18 @@ func TestTimeoutInterceptor_HandlerSeesCancelledContext(t *testing.T) {
 		case <-c.RequestContext().Done():
 			cancelled.Store(true)
 			return c.RequestContext().Err()
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(500 * time.Millisecond):
 			return nil
 		}
 	})
 
+	// The interceptor returns as soon as the timeout fires; the handler
+	// goroutine is still running. Give it up to 1s to observe cancel and
+	// store the flag.
+	deadline := time.Now().Add(time.Second)
+	for !cancelled.Load() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 	if !cancelled.Load() {
 		t.Error("handler did not observe context cancellation")
 	}

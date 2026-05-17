@@ -17,6 +17,29 @@ type testSvc struct {
 	name string
 }
 
+// waitForCondition polls cond every millisecond up to timeout. Returns true
+// when cond becomes true, false on timeout. Used to replace fixed-duration
+// time.Sleep waits in lifecycle tests — tightens the wall-clock cost from
+// the blanket sleep duration to the actual time the condition needs.
+func waitForCondition(timeout time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return cond()
+}
+
+// signalShutdown sends SIGINT to the current process and waits for errCh.
+func signalShutdown(t *testing.T, errCh chan error) {
+	t.Helper()
+	p, _ := os.FindProcess(os.Getpid())
+	_ = p.Signal(os.Interrupt)
+	<-errCh
+}
+
 func TestAppNew(t *testing.T) {
 	app := New()
 	if app == nil {
@@ -59,46 +82,33 @@ func TestAppRunResolvesModules(t *testing.T) {
 		errCh <- app.Run()
 	}()
 
-	// Wait for app to start and build container
-	time.Sleep(100 * time.Millisecond)
-
-	container := app.Container()
-	if container == nil {
-		t.Fatal("expected container to be built after Run()")
+	if !waitForCondition(2*time.Second, func() bool { return app.container.Load() != nil }) {
+		t.Fatal("container not built within 2s")
 	}
 
-	svc := di.MustResolve[*testSvc](container)
+	svc := di.MustResolve[*testSvc](app.Container())
 	if svc.name != "svc" {
 		t.Fatalf("expected 'svc', got %s", svc.name)
 	}
 
-	// Send shutdown signal to stop the app
-	process, _ := os.FindProcess(os.Getpid())
-	_ = process.Signal(os.Interrupt)
-
-	// Wait for app to stop
-	<-errCh
+	signalShutdown(t, errCh)
 }
 
 func TestAppRunLocksApp(t *testing.T) {
 	app := New()
 	app.Register(NewModule("test"))
 
-	// Run app in background
 	errCh := make(chan error, 1)
-	go func() {
-		errCh <- app.Run()
-	}()
+	go func() { errCh <- app.Run() }()
 
-	// Wait for app to start
-	time.Sleep(100 * time.Millisecond)
+	// Use container as start signal — atomic.Pointer is safe to read
+	// concurrently. The plain bool app.started would race with Run.
+	if !waitForCondition(2*time.Second, func() bool { return app.container.Load() != nil }) {
+		t.Fatal("app did not start within 2s")
+	}
 
 	defer func() {
-		// Send shutdown signal to stop the app
-		process, _ := os.FindProcess(os.Getpid())
-		_ = process.Signal(os.Interrupt)
-		<-errCh
-
+		signalShutdown(t, errCh)
 		if r := recover(); r == nil {
 			t.Fatal("expected panic on Register after Run")
 		}
@@ -110,21 +120,17 @@ func TestAppRunLocksApp(t *testing.T) {
 func TestAppProvideLocksApp(t *testing.T) {
 	app := New()
 
-	// Run app in background
 	errCh := make(chan error, 1)
-	go func() {
-		errCh <- app.Run()
-	}()
+	go func() { errCh <- app.Run() }()
 
-	// Wait for app to start
-	time.Sleep(100 * time.Millisecond)
+	// Use container as start signal — atomic.Pointer is safe to read
+	// concurrently. The plain bool app.started would race with Run.
+	if !waitForCondition(2*time.Second, func() bool { return app.container.Load() != nil }) {
+		t.Fatal("app did not start within 2s")
+	}
 
 	defer func() {
-		// Send shutdown signal to stop the app
-		process, _ := os.FindProcess(os.Getpid())
-		_ = process.Signal(os.Interrupt)
-		<-errCh
-
+		signalShutdown(t, errCh)
 		if r := recover(); r == nil {
 			t.Fatal("expected panic on Provide after Run")
 		}
@@ -140,37 +146,21 @@ func TestAppContainerEscapeHatch(t *testing.T) {
 		Providers(Value(&testSvc{name: "hatch"})),
 	))
 
-	// Run app in background
 	errCh := make(chan error, 1)
-	go func() {
-		errCh <- app.Run()
-	}()
+	go func() { errCh <- app.Run() }()
 
-	// Wait for app to start
-	time.Sleep(100 * time.Millisecond)
-
-	c := app.Container()
-	if c == nil {
-		// Send shutdown signal before failing
-		process, _ := os.FindProcess(os.Getpid())
-		_ = process.Signal(os.Interrupt)
-		<-errCh
-		t.Fatal("expected container escape hatch")
+	if !waitForCondition(2*time.Second, func() bool { return app.container.Load() != nil }) {
+		signalShutdown(t, errCh)
+		t.Fatal("expected container escape hatch within 2s")
 	}
+	c := app.Container()
 
 	svc := di.MustResolve[*testSvc](c)
 	if svc.name != "hatch" {
-		// Send shutdown signal before failing
-		process, _ := os.FindProcess(os.Getpid())
-		_ = process.Signal(os.Interrupt)
-		<-errCh
+		signalShutdown(t, errCh)
 		t.Fatalf("expected 'hatch', got %s", svc.name)
 	}
-
-	// Send shutdown signal to stop the app
-	process, _ := os.FindProcess(os.Getpid())
-	_ = process.Signal(os.Interrupt)
-	<-errCh
+	signalShutdown(t, errCh)
 }
 
 func TestAppContainerPanicsBeforeRun(t *testing.T) {
@@ -225,7 +215,7 @@ func TestExecuteHooksParallel_EmptyReturnsNil(t *testing.T) {
 
 func TestAppShutdown_ReturnsJoinedErrors(t *testing.T) {
 	a := New()
-	a.opts.logger = logger.New()
+	a.opts.logger = logger.Noop()
 	a.moduleHooks = &app.ModuleHooks{
 		Providers: []lifecycle.Hooks{
 			{OnDestroy: func() error { return errors.New("p1-destroy") }},
@@ -252,7 +242,7 @@ func TestAppShutdown_ReturnsJoinedErrors(t *testing.T) {
 
 func TestAppShutdown_NoHooksReturnsNil(t *testing.T) {
 	a := New()
-	a.opts.logger = logger.New()
+	a.opts.logger = logger.Noop()
 	a.moduleHooks = &app.ModuleHooks{}
 	if err := a.shutdown(); err != nil {
 		t.Errorf("expected nil shutdown error, got %v", err)

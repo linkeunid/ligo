@@ -125,6 +125,10 @@ func WithJSON() Option {
 	}
 }
 
+// NoopLogger returns a Logger that discards every call. Convenient for tests
+// that want to bypass log spam without importing internal/core/logger.
+func NoopLogger() Logger { return logger.Noop() }
+
 // WithMiddleware adds global middleware.
 func WithMiddleware(mw ...Middleware) Option {
 	return func(o *options) {
@@ -132,10 +136,15 @@ func WithMiddleware(mw ...Middleware) Option {
 	}
 }
 
-// WithLogger sets the logger.
+// WithLogger overrides the framework logger. Useful in tests (pass
+// ligo.NoopLogger() to silence startup/shutdown chatter) and for binaries
+// that want to share a logger across the app and their own subsystems.
+// nil is treated as "no override" — keeps the default constructed logger.
 func WithLogger(l Logger) Option {
 	return func(o *options) {
-		o.logger = l
+		if l != nil {
+			o.logger = l
+		}
 	}
 }
 

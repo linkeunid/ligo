@@ -63,7 +63,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 
 		router := &mockRouter{}
 		c := di.New()
-		log := logger.New()
+		log := logger.Noop()
 		binder := NewBinder(c, router, log)
 
 		_, err := binder.BindControllers([]module.Module{mainMod})
@@ -99,7 +99,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 
 		router := &mockRouter{}
 		c := di.New()
-		log := logger.New()
+		log := logger.Noop()
 		binder := NewBinder(c, router, log)
 
 		_, err := binder.BindControllers([]module.Module{svcMod})
@@ -128,7 +128,7 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 
 		router := &mockRouter{}
 		c := di.New()
-		log := logger.New()
+		log := logger.Noop()
 		binder := NewBinder(c, router, log)
 
 		_, err := binder.BindControllers([]module.Module{mod})
@@ -156,7 +156,7 @@ func TestBindModule_MiddlewareDoesNotPrefixRoutes(t *testing.T) {
 
 	router := &mockRouter{}
 	c := di.New()
-	log := logger.New()
+	log := logger.Noop()
 	binder := NewBinder(c, router, log)
 
 	if _, err := binder.BindControllers([]module.Module{mod}); err != nil {
@@ -184,7 +184,7 @@ func TestBindModule_NoMiddlewareSkipsGroup(t *testing.T) {
 	)
 
 	router := &mockRouter{}
-	binder := NewBinder(di.New(), router, logger.New())
+	binder := NewBinder(di.New(), router, logger.Noop())
 
 	if _, err := binder.BindControllers([]module.Module{mod}); err != nil {
 		t.Fatalf("BindControllers: %v", err)
@@ -212,7 +212,7 @@ func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
 	)
 
 	router := &mockRouter{}
-	log := logger.New()
+	log := logger.Noop()
 	binder := NewBinder(c, router, log)
 
 	_, err := binder.BindControllers([]module.Module{mod})
@@ -226,5 +226,47 @@ func TestBindController_MissingDep_ReturnsErrControllerBinding(t *testing.T) {
 	}
 	if bindErr.Module != "user" {
 		t.Errorf("Module = %q, want %q", bindErr.Module, "user")
+	}
+}
+
+func TestErrControllerBinding_ErrorFormatsMissingDep(t *testing.T) {
+	e := &ErrControllerBinding{
+		Module:     "User",
+		TypeName:   "UserCtrl",
+		Dependency: "*UserService",
+		Cause:      &di.ErrMissingDependency{Type: "*Database", RequiredBy: "*UserService"},
+	}
+	msg := e.Error()
+	for _, want := range []string{"UserCtrl", "User", "UserService", "Database", "required by"} {
+		if !contains(msg, want) {
+			t.Errorf("missing %q in:\n%s", want, msg)
+		}
+	}
+}
+
+func TestErrControllerBinding_ErrorFormatsNilCause(t *testing.T) {
+	e := &ErrControllerBinding{Module: "M", TypeName: "T", Dependency: "Dep"}
+	if !contains(e.Error(), "no provider registered") {
+		t.Errorf("expected fallback message, got %q", e.Error())
+	}
+}
+
+func TestErrControllerBinding_ErrorWithGenericCause(t *testing.T) {
+	e := &ErrControllerBinding{
+		Module:     "M",
+		TypeName:   "T",
+		Dependency: "Dep",
+		Cause:      errors.New("explosion"),
+	}
+	if !contains(e.Error(), "explosion") {
+		t.Errorf("generic cause missing: %q", e.Error())
+	}
+}
+
+func TestErrControllerBinding_Unwrap(t *testing.T) {
+	root := errors.New("root")
+	e := &ErrControllerBinding{Cause: root}
+	if !errors.Is(e, root) {
+		t.Error("errors.Is did not traverse Unwrap")
 	}
 }

@@ -15,6 +15,21 @@ import (
 	"github.com/linkeunid/ligo/adapters/echo"
 )
 
+// waitFor polls cond every millisecond up to timeout. Returns true when
+// cond becomes true, false on timeout. Used to replace fixed-duration
+// time.Sleep waits in lifecycle integration tests — tightens wall-clock
+// cost from the blanket sleep duration to actual readiness.
+func waitFor(timeout time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return cond()
+}
+
 // TestDatabase is a test service that implements Register for compile-time safe hook registration.
 type TestDatabase struct {
 	conn           string
@@ -78,6 +93,7 @@ func TestAppLifecycle(t *testing.T) {
 
 		// Create app with lifecycle hooks
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"), // Use random port
 			ligo.OnStart(func(ctx any) error {
@@ -100,7 +116,7 @@ func TestAppLifecycle(t *testing.T) {
 		}()
 
 		// Wait for server to start
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Verify hooks were called
 		if !onStartCalled.Load() {
@@ -143,6 +159,7 @@ func TestAppLifecycle(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 			ligo.OnStart(func(ctx any) error {
@@ -163,7 +180,7 @@ func TestAppLifecycle(t *testing.T) {
 		}()
 
 		// Wait for hooks to execute
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(75 * time.Millisecond)
 
 		// Snapshot under the mutex — addOrder writes from goroutines.
 		mu.Lock()
@@ -208,6 +225,7 @@ func TestDIResolution(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -223,7 +241,7 @@ func TestDIResolution(t *testing.T) {
 		}()
 
 		// Wait for startup
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Shutdown
 		cancel()
@@ -250,6 +268,7 @@ func TestDIResolution(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -263,7 +282,7 @@ func TestDIResolution(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		cancel()
 
@@ -322,6 +341,7 @@ func TestMultipleModules(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -335,7 +355,7 @@ func TestMultipleModules(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	cancel()
 
@@ -375,6 +395,7 @@ func TestModuleImports(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -388,7 +409,7 @@ func TestModuleImports(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	cancel()
 
@@ -431,6 +452,7 @@ func TestDynamicModule(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -444,7 +466,7 @@ func TestDynamicModule(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// If we got here without panic, dynamic module worked
 	cancel()
@@ -474,6 +496,7 @@ func TestModuleHooks(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -485,9 +508,7 @@ func TestModuleHooks(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
-
-	if !initCalled.Load() {
+	if !waitFor(2*time.Second, initCalled.Load) {
 		t.Error("OnModuleInit was not called")
 	}
 
@@ -509,6 +530,7 @@ func TestControllerRegistration(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -522,7 +544,7 @@ func TestControllerRegistration(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if !controllerRoutesCalled.Load() {
 		t.Error("Controller Routes method was not called")
@@ -570,6 +592,7 @@ func TestMiddleware(t *testing.T) {
 	)
 
 	app := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -583,7 +606,7 @@ func TestMiddleware(t *testing.T) {
 		runErr <- app.Run()
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// Note: Middleware is called during request handling
 	// We'd need to make an actual HTTP request to verify it works
@@ -611,6 +634,7 @@ func TestProviderTypes(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -624,7 +648,7 @@ func TestProviderTypes(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Trigger shutdown
 		cancel()
@@ -649,6 +673,7 @@ func TestProviderTypes(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -662,7 +687,7 @@ func TestProviderTypes(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Trigger shutdown
 		cancel()
@@ -687,6 +712,7 @@ func TestProviderTypes(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -700,7 +726,7 @@ func TestProviderTypes(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Trigger shutdown
 		cancel()
@@ -719,6 +745,7 @@ func TestProviderTypes(t *testing.T) {
 func TestAppOptions(t *testing.T) {
 	t.Run("with auto port", func(t *testing.T) {
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":8080"),
 			ligo.WithAutoPort(),
@@ -733,7 +760,7 @@ func TestAppOptions(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Trigger shutdown
 		cancel()
@@ -749,6 +776,7 @@ func TestAppOptions(t *testing.T) {
 
 	t.Run("with debug mode", func(t *testing.T) {
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 			ligo.WithDebug(true),
@@ -763,7 +791,7 @@ func TestAppOptions(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Trigger shutdown
 		cancel()
@@ -779,6 +807,7 @@ func TestAppOptions(t *testing.T) {
 
 	t.Run("with JSON logging", func(t *testing.T) {
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 			ligo.WithJSON(),
@@ -791,7 +820,7 @@ func TestAppOptions(t *testing.T) {
 			runErr <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		_ = runErr
 	})
 }
@@ -809,6 +838,7 @@ func TestErrorHandling(t *testing.T) {
 		)
 
 		app := ligo.New(
+			ligo.WithLogger(ligo.NoopLogger()),
 			ligo.WithRouter(echo.NewAdapter()),
 			ligo.WithAddr(":0"),
 		)
@@ -867,6 +897,7 @@ func TestImportedModuleRoutes(t *testing.T) {
 	)
 
 	application := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -875,7 +906,7 @@ func TestImportedModuleRoutes(t *testing.T) {
 	runErr := make(chan error, 1)
 	go func() { runErr <- application.Run() }()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if authCalls.Load() != 1 {
 		t.Errorf("auth controller Routes() called %d times, want 1", authCalls.Load())
@@ -903,6 +934,7 @@ func TestSharedImportRegisteredOnce(t *testing.T) {
 	mainModule := ligo.NewModule("shared-main", ligo.Imports(userModule, fileModule))
 
 	application := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -911,7 +943,7 @@ func TestSharedImportRegisteredOnce(t *testing.T) {
 	runErr := make(chan error, 1)
 	go func() { runErr <- application.Run() }()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if authCalls.Load() != 1 {
 		t.Errorf("shared auth controller Routes() called %d times, want exactly 1", authCalls.Load())
@@ -945,6 +977,7 @@ func TestDynamicModuleWithImports(t *testing.T) {
 	)
 
 	application := ligo.New(
+		ligo.WithLogger(ligo.NoopLogger()),
 		ligo.WithRouter(echo.NewAdapter()),
 		ligo.WithAddr(":0"),
 	)
@@ -953,7 +986,7 @@ func TestDynamicModuleWithImports(t *testing.T) {
 	runErr := make(chan error, 1)
 	go func() { runErr <- application.Run() }()
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if childCalls.Load() != 1 {
 		t.Errorf("dynamic child controller Routes() called %d times, want 1", childCalls.Load())
@@ -1040,7 +1073,7 @@ func TestLifecycleHooks(t *testing.T) {
 	t.Run("non-HTTP mode executes all hooks", func(t *testing.T) {
 		tracker := &lifecycleTracker{calls: []string{}}
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(
 			ligo.NewModule(
 				"test",
@@ -1057,7 +1090,7 @@ func TestLifecycleHooks(t *testing.T) {
 		}()
 
 		// Give time for init and bootstrap hooks to execute
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		// Send shutdown signal
 		process, _ := os.FindProcess(os.Getpid())
@@ -1091,7 +1124,7 @@ func TestLifecycleHooks(t *testing.T) {
 	t.Run("hooks execute in registration order", func(t *testing.T) {
 		tracker := &lifecycleTracker{calls: []string{}}
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(
 			ligo.NewModule(
 				"test",
@@ -1108,7 +1141,7 @@ func TestLifecycleHooks(t *testing.T) {
 			errCh <- app.Run()
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		process, _ := os.FindProcess(os.Getpid())
 		if err := process.Signal(os.Interrupt); err != nil {
@@ -1144,7 +1177,7 @@ func TestLifecycleHooks(t *testing.T) {
 	t.Run("WithParallelHooks fires both without order guarantee", func(t *testing.T) {
 		tracker := &lifecycleTracker{calls: []string{}}
 
-		app := ligo.New(ligo.WithParallelHooks())
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()), ligo.WithParallelHooks())
 		app.Register(
 			ligo.NewModule(
 				"test",
@@ -1158,7 +1191,7 @@ func TestLifecycleHooks(t *testing.T) {
 		errCh := make(chan error, 1)
 		go func() { errCh <- app.Run() }()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		process, _ := os.FindProcess(os.Getpid())
 		if err := process.Signal(os.Interrupt); err != nil {
@@ -1191,7 +1224,7 @@ func TestExplicitHookRegistration(t *testing.T) {
 	t.Run("provider with explicit hooks", func(t *testing.T) {
 		var initCalled, shutdownCalled atomic.Bool
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(
 			ligo.NewModule(
 				"test",
@@ -1220,7 +1253,7 @@ func TestExplicitHookRegistration(t *testing.T) {
 		}()
 
 		// Give time for init hook to execute
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		if !initCalled.Load() {
 			t.Error("OnInit hook was not called")
@@ -1242,7 +1275,7 @@ func TestExplicitHookRegistration(t *testing.T) {
 	t.Run("module with explicit hooks", func(t *testing.T) {
 		var moduleInitCalled, moduleDestroyCalled atomic.Bool
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(
 			ligo.NewModule(
 				"test",
@@ -1266,7 +1299,7 @@ func TestExplicitHookRegistration(t *testing.T) {
 		}()
 
 		// Give time for init hook to execute
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		if !moduleInitCalled.Load() {
 			t.Error("Module OnInit hook was not called")
@@ -1309,13 +1342,13 @@ func TestHookedSingleton_EagerResolve(t *testing.T) {
 			),
 		)
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(testModule)
 
 		errCh := make(chan error, 1)
 		go func() { errCh <- app.Run() }()
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		if !initCalled.Load() {
 			t.Error("HookedSingleton OnInit was not called — eager resolution failed")
@@ -1352,7 +1385,7 @@ func TestHookedFactory_RegisterMethod(t *testing.T) {
 			),
 		)
 
-		app := ligo.New()
+		app := ligo.New(ligo.WithLogger(ligo.NoopLogger()))
 		app.Register(testModule)
 
 		// Run in background
@@ -1362,7 +1395,7 @@ func TestHookedFactory_RegisterMethod(t *testing.T) {
 		}()
 
 		// Give time for init hook to execute
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 
 		if !initCalled.Load() {
 			t.Error("Database OnInit hook was not called")

@@ -308,7 +308,7 @@ func TestExecuteHooks(t *testing.T) {
 			{func() error { calls = append(calls, "2-1"); return nil }},
 		}
 
-		log := logger.New()
+		log := logger.Noop()
 		err := ExecuteHooks(hooks, log, "test")
 		if err != nil {
 			t.Errorf("ExecuteHooks() returned error: %v", err)
@@ -326,7 +326,7 @@ func TestExecuteHooks(t *testing.T) {
 			{func() error { calls = append(calls, "3-1"); return nil }},
 		}
 
-		log := logger.New()
+		log := logger.Noop()
 		err := ExecuteHooks(hooks, log, "test")
 
 		if err == nil {
@@ -351,7 +351,7 @@ func TestExecuteHooks(t *testing.T) {
 
 	t.Run("empty hooks", func(t *testing.T) {
 		hooks := [][]func() error{}
-		log := logger.New()
+		log := logger.Noop()
 
 		err := ExecuteHooks(hooks, log, "test")
 		if err != nil {
@@ -371,7 +371,7 @@ func TestExecuteHooks(t *testing.T) {
 			},
 		}
 
-		log := logger.New()
+		log := logger.Noop()
 		err := ExecuteHooks(hooks, log, "test")
 		if err != nil {
 			t.Errorf("ExecuteHooks() returned error: %v", err)
