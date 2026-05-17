@@ -37,6 +37,7 @@ func mergeHooks(destination *lifecycle.Hooks, source lifecycle.Hooks) {
 type Provider interface {
 	Type() reflect.Type
 	Eager() any
+	Fn() any
 	IsTransient() bool
 	IsExported() bool
 	IsEagerResolve() bool
@@ -68,7 +69,7 @@ func BuildProviderEntry(p Provider) (di.ProviderEntry, lifecycle.Hooks) {
 		return di.NewEntry(nil, p.Eager(), nil, p.IsTransient(), p.IsExported(), nil), hooks
 	}
 
-	fn := reflect.ValueOf(p).MethodByName("Fn").Call([]reflect.Value{})[0].Interface()
+	fn := p.Fn()
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 
@@ -98,8 +99,6 @@ func RegisterProvider(c *di.Container, p Provider) lifecycle.Hooks {
 // BuildModule registers providers from a module and its imports in the di.
 // The module must have been pre-expanded by ExpandModule — dynamic fields are not processed here.
 func BuildModule(parent *di.Container, mod module.Module, hooks *ModuleHooks) {
-	modContainer := parent
-
 	// Pre-allocate capacity for provider hooks to reduce slice growth
 	if cap(hooks.Providers) < len(hooks.Providers)+len(mod.Providers) {
 		newCap := len(hooks.Providers) + len(mod.Providers)
@@ -109,14 +108,13 @@ func BuildModule(parent *di.Container, mod module.Module, hooks *ModuleHooks) {
 	}
 
 	for _, p := range mod.Providers {
-		provider, _ := p.(Provider)
+		provider, ok := p.(Provider)
+		if !ok {
+			panic(fmt.Sprintf("ligo: module %q provider does not implement Provider interface (got %T)", mod.Name, p))
+		}
 		entry, providerHooks := BuildProviderEntry(provider)
 
-		if provider.IsExported() {
-			parent.Register(provider.Type(), entry)
-		} else {
-			modContainer.Register(provider.Type(), entry)
-		}
+		parent.Register(provider.Type(), entry)
 
 		// Collect hooks if any are implemented or if registry is set (for HookedFactory pattern)
 		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnBeforeShutdown != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil || providerHooks.HasRegistry() {

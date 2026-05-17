@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
@@ -41,7 +42,7 @@ func (m *mockProvider) IsEagerResolve() bool {
 	return false
 }
 
-func (m *mockProvider) Fn() func() string {
+func (m *mockProvider) Fn() any {
 	return func() string { return "test" }
 }
 
@@ -248,9 +249,8 @@ func TestBuildModule(t *testing.T) {
 		}
 	})
 
-	t.Run("exported vs non-exported providers", func(t *testing.T) {
+	t.Run("exported vs non-exported providers both register on parent", func(t *testing.T) {
 		parent := di.New()
-		child := parent.NewChild()
 
 		type ExportedType struct{}
 		type NotExportedType struct{}
@@ -264,15 +264,39 @@ func TestBuildModule(t *testing.T) {
 		)
 
 		hooks := &ModuleHooks{}
-		BuildModule(child, m, hooks)
+		BuildModule(parent, m, hooks)
 
-		// Both should be in child since modContainer := parent in BuildModule
-		// The exported flag is used for sibling module visibility, not parent/child containers
-		childTypes := child.Types()
-
-		if len(childTypes) != 2 {
-			t.Errorf("Child container has %d types, want 2", len(childTypes))
+		// Both providers register on the passed-in container regardless of IsExported.
+		// IsExported is stored in the entry metadata for downstream introspection but
+		// does not affect registration target after batch 2 collapse.
+		parentTypes := parent.Types()
+		if len(parentTypes) != 2 {
+			t.Errorf("parent container has %d types, want 2", len(parentTypes))
 		}
+	})
+
+	t.Run("non-Provider in mod.Providers panics with descriptive message", func(t *testing.T) {
+		parent := di.New()
+		m := module.New("broken")
+		m.Providers = []any{"not a provider"}
+
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Fatal("expected panic")
+			}
+			msg, ok := r.(string)
+			if !ok {
+				t.Fatalf("expected string panic, got %T: %v", r, r)
+			}
+			if !strings.Contains(msg, "does not implement Provider") {
+				t.Errorf("panic missing context: %q", msg)
+			}
+			if !strings.Contains(msg, "broken") {
+				t.Errorf("panic missing module name: %q", msg)
+			}
+		}()
+		BuildModule(parent, m, &ModuleHooks{})
 	})
 }
 

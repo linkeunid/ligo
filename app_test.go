@@ -1,10 +1,15 @@
 package ligo
 
 import (
+	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/linkeunid/ligo/internal/app"
+	"github.com/linkeunid/ligo/internal/core/lifecycle"
+	"github.com/linkeunid/ligo/internal/core/logger"
 	"github.com/linkeunid/ligo/internal/di"
 )
 
@@ -178,4 +183,78 @@ func TestAppContainerPanicsBeforeRun(t *testing.T) {
 	}()
 
 	_ = app.Container()
+}
+
+func TestExecuteHooksParallel_JoinsErrors(t *testing.T) {
+	tasks := []hookTask{
+		{hook: func() error { return errors.New("first") }},
+		{hook: func() error { return nil }},
+		{hook: func() error { return errors.New("third") }},
+	}
+	err := executeHooksParallel(tasks)
+	if err == nil {
+		t.Fatal("expected joined error")
+	}
+	if !strings.Contains(err.Error(), "first") {
+		t.Errorf("missing 'first': %v", err)
+	}
+	if !strings.Contains(err.Error(), "third") {
+		t.Errorf("missing 'third': %v", err)
+	}
+	joined, ok := err.(interface{ Unwrap() []error })
+	if !ok {
+		t.Fatalf("expected errors.Join result, got %T", err)
+	}
+	if got := len(joined.Unwrap()); got != 2 {
+		t.Errorf("expected 2 wrapped errors, got %d", got)
+	}
+}
+
+func TestExecuteHooksParallel_NoErrorReturnsNil(t *testing.T) {
+	tasks := []hookTask{{hook: func() error { return nil }}}
+	if err := executeHooksParallel(tasks); err != nil {
+		t.Errorf("expected nil, got %v", err)
+	}
+}
+
+func TestExecuteHooksParallel_EmptyReturnsNil(t *testing.T) {
+	if err := executeHooksParallel(nil); err != nil {
+		t.Errorf("expected nil for empty tasks, got %v", err)
+	}
+}
+
+func TestAppShutdown_ReturnsJoinedErrors(t *testing.T) {
+	a := New()
+	a.opts.logger = logger.New()
+	a.moduleHooks = &app.ModuleHooks{
+		Providers: []lifecycle.Hooks{
+			{OnDestroy: func() error { return errors.New("p1-destroy") }},
+			{OnShutdown: func() error { return errors.New("p2-shutdown") }},
+			{OnBeforeShutdown: func() error { return errors.New("p3-before") }},
+		},
+	}
+
+	err := a.shutdown()
+	if err == nil {
+		t.Fatal("expected joined shutdown error")
+	}
+	for _, want := range []string{"p1-destroy", "p2-shutdown", "p3-before"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("missing %q in: %v", want, err)
+		}
+	}
+	for _, prefix := range []string{"OnModuleDestroy", "OnApplicationShutdown", "BeforeApplicationShutdown"} {
+		if !strings.Contains(err.Error(), prefix) {
+			t.Errorf("missing prefix %q in: %v", prefix, err)
+		}
+	}
+}
+
+func TestAppShutdown_NoHooksReturnsNil(t *testing.T) {
+	a := New()
+	a.opts.logger = logger.New()
+	a.moduleHooks = &app.ModuleHooks{}
+	if err := a.shutdown(); err != nil {
+		t.Errorf("expected nil shutdown error, got %v", err)
+	}
 }

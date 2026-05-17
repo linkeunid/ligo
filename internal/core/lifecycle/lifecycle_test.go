@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -280,10 +282,8 @@ func TestConcurrentStart(t *testing.T) {
 	panicCount := 0
 	var mu sync.Mutex
 
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			defer func() {
 				if r := recover(); r != nil {
 					mu.Lock()
@@ -292,13 +292,146 @@ func TestConcurrentStart(t *testing.T) {
 				}
 			}()
 			l.Start(ctx)
-		}()
+		})
 	}
 
 	wg.Wait()
 
 	if panicCount == 0 {
 		t.Error("Expected at least one panic from concurrent Start() calls")
+	}
+}
+
+func TestAddServer_PanicsAfterStart(t *testing.T) {
+	l := New()
+	if err := l.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on AddServer after Start")
+		}
+	}()
+	l.AddServer(&http.Server{})
+}
+
+func TestAppendStartHook_PanicsAfterStart(t *testing.T) {
+	l := New()
+	if err := l.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on AppendStartHook after Start")
+		}
+	}()
+	l.AppendStartHook(func(context.Context) error { return nil })
+}
+
+func TestAppendStopHook_PanicsAfterStart(t *testing.T) {
+	l := New()
+	if err := l.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on AppendStopHook after Start")
+		}
+	}()
+	l.AppendStopHook(func(context.Context) error { return nil })
+}
+
+func TestConcurrentAppend_NoRace(t *testing.T) {
+	l := New()
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Go(func() {
+			l.AppendStartHook(func(context.Context) error { return nil })
+			if i%2 == 0 {
+				l.AppendStopHook(func(context.Context) error { return nil })
+			}
+		})
+	}
+	wg.Wait()
+	if len(l.onStart) != 50 {
+		t.Errorf("expected 50 start hooks, got %d", len(l.onStart))
+	}
+	if len(l.onStop) != 25 {
+		t.Errorf("expected 25 stop hooks, got %d", len(l.onStop))
+	}
+}
+
+func TestStop_Idempotent(t *testing.T) {
+	l := New()
+	count := 0
+	l.AppendStopHook(func(context.Context) error { count++; return nil })
+
+	if err := l.Stop(context.Background()); err != nil {
+		t.Fatalf("first Stop: %v", err)
+	}
+	if err := l.Stop(context.Background()); err != nil {
+		t.Fatalf("second Stop: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected hook called once, got %d", count)
+	}
+}
+
+func TestStop_Concurrent(t *testing.T) {
+	l := New()
+	var calls atomic.Int32
+	l.AppendStopHook(func(context.Context) error { calls.Add(1); return nil })
+
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Go(func() {
+			_ = l.Stop(context.Background())
+		})
+	}
+	wg.Wait()
+	if calls.Load() != 1 {
+		t.Errorf("expected hook called exactly once, got %d", calls.Load())
+	}
+}
+
+func TestStart_RollsBackOnHookFailure(t *testing.T) {
+	l := New()
+	stopOrder := []int{}
+
+	l.AppendStartHook(func(context.Context) error { return nil })
+	l.AppendStopHook(func(context.Context) error { stopOrder = append(stopOrder, 0); return nil })
+	l.AppendStartHook(func(context.Context) error { return nil })
+	l.AppendStopHook(func(context.Context) error { stopOrder = append(stopOrder, 1); return nil })
+	l.AppendStartHook(func(context.Context) error { return errors.New("boom") })
+	l.AppendStopHook(func(context.Context) error { stopOrder = append(stopOrder, 2); return nil })
+
+	err := l.Start(context.Background())
+	if err == nil {
+		t.Fatal("expected Start error")
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Errorf("expected error to contain 'boom', got %v", err)
+	}
+	if len(stopOrder) != 2 || stopOrder[0] != 1 || stopOrder[1] != 0 {
+		t.Errorf("expected reverse rollback [1, 0], got %v", stopOrder)
+	}
+}
+
+func TestStart_RollbackJoinsErrors(t *testing.T) {
+	l := New()
+	l.AppendStartHook(func(context.Context) error { return nil })
+	l.AppendStopHook(func(context.Context) error { return errors.New("rollback-fail") })
+	l.AppendStartHook(func(context.Context) error { return errors.New("start-fail") })
+
+	err := l.Start(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "start-fail") {
+		t.Errorf("missing start-fail: %v", err)
+	}
+	if !strings.Contains(err.Error(), "rollback-fail") {
+		t.Errorf("missing rollback-fail: %v", err)
 	}
 }
 

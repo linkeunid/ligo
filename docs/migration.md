@@ -90,6 +90,53 @@ Restores the pre-0.10.0 parallel execution of provider `OnInit` and
 `OnBootstrap` hooks. See "sequential by default" above for guidance on
 when to enable it.
 
+### Lifecycle: append-after-Start now panics
+
+`AppLifecycle.AddServer`, `AppendStartHook`, and `AppendStopHook` panic
+with `"ligo: lifecycle already started"` if called after `Start()` (same
+panic message as the existing double-start guard). All three methods now
+hold `mu` for the duration of the append, so concurrent registration
+during the wiring phase is race-free. Previously, late appends silently
+succeeded but the hooks never fired and the writes raced with `Start`.
+
+### Lifecycle: `Stop()` is idempotent
+
+A second `Stop()` returns `nil` immediately instead of double-shutting
+down the HTTP server and re-running stop hooks. Concurrent `Stop()` calls
+now run hooks exactly once.
+
+### Lifecycle: `Start()` rolls back on hook failure
+
+If start hook `i` returns an error, stop hooks at indices `i-1..0` run in
+reverse before `Start` returns. The returned error is
+`errors.Join(originalErr, rollbackErrs...)` so callers can inspect both
+the original failure and any rollback failures with `errors.Is` /
+`errors.As`. No opt-out flag — rollback is always on.
+
+### Shutdown errors are returned, not swallowed
+
+`(*App).shutdown` previously logged each `BeforeApplicationShutdown` /
+`OnApplicationShutdown` / `OnModuleDestroy` failure but returned `nil`,
+so operators got exit code 0 even on partial-shutdown failures. It now
+returns `errors.Join` of every wrapped failure (each prefixed with the
+hook kind, e.g. `"OnApplicationShutdown: ..."`). The HTTP serve path
+propagates the joined error to callers.
+
+### Parallel hook errors carry full messages
+
+`executeHooksParallel` used to return the string
+`"hook execution failed: %d errors occurred"`, discarding the individual
+error messages. It now returns `errors.Join` of every hook failure so
+calling code can `errors.As` to inspect specific causes.
+
+### Internal: `app.Provider` interface adds `Fn() any`
+
+The internal `internal/app.Provider` interface now requires `Fn() any`,
+removing the prior `reflect.ValueOf(p).MethodByName("Fn").Call(...)`
+shortcut. The root-package `ligo.Provider` struct already exposes
+`Fn() any`, so user code is unaffected. Only matters for downstreams
+that embed the internal interface directly.
+
 ---
 
 ## 0.9.0 → 0.9.6

@@ -5,6 +5,7 @@ package ligo
 // module system, and request processing with Guards, Pipes, Interceptors, and Exception Filters.
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -290,36 +291,28 @@ func executeProviderHooksParallel(providers []lifecycle.Hooks, getHook func(*lif
 	return executeHooksParallel(tasks)
 }
 
-// executeHooksParallel executes hooks in parallel and collects errors.
+// executeHooksParallel executes hooks in parallel and returns errors.Join
+// of all hook failures (nil if all succeeded).
 func executeHooksParallel(tasks []hookTask) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(tasks))
-	results := make([]error, 0, len(tasks))
 
 	for _, task := range tasks {
-		wg.Add(1)
-		go func(t hookTask) {
-			defer wg.Done()
-			if err := t.hook(); err != nil {
+		wg.Go(func() {
+			if err := task.hook(); err != nil {
 				errChan <- err
 			}
-		}(task)
+		})
 	}
 
-	go func() {
-		wg.Wait()
-		close(errChan)
-	}()
+	wg.Wait()
+	close(errChan)
 
-	// Collect errors
+	var results []error
 	for err := range errChan {
 		results = append(results, err)
 	}
-
-	if len(results) > 0 {
-		return fmt.Errorf("hook execution failed: %d errors occurred", len(results))
-	}
-	return nil
+	return errors.Join(results...)
 }
 
 // getLogFields returns log fields for application startup.
@@ -358,37 +351,41 @@ func (a *App) startServer() error {
 }
 
 // shutdown executes BeforeApplicationShutdown, OnApplicationShutdown, and OnModuleDestroy hooks in reverse order.
-// Logs errors but continues executing remaining hooks.
+// Logs each error as it happens and returns errors.Join of every failure so callers
+// can propagate a non-zero exit status.
 func (a *App) shutdown() error {
-	// Execute provider shutdown and destroy hooks in reverse order
+	var errs []error
 	for i := len(a.moduleHooks.Providers) - 1; i >= 0; i-- {
 		// Only refresh if registry exists (HookedFactory pattern where RegisterFrom may have been called during resolution)
 		if a.moduleHooks.Providers[i].HasRegistry() {
 			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
 		}
-		if a.moduleHooks.Providers[i].OnBeforeShutdown != nil {
-			if err := a.moduleHooks.Providers[i].OnBeforeShutdown(); err != nil {
+		if h := a.moduleHooks.Providers[i].OnBeforeShutdown; h != nil {
+			if err := h(); err != nil {
 				a.opts.logger.Error("BeforeApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
+				errs = append(errs, fmt.Errorf("BeforeApplicationShutdown: %w", err))
 			}
 		}
-		if a.moduleHooks.Providers[i].OnShutdown != nil {
-			if err := a.moduleHooks.Providers[i].OnShutdown(); err != nil {
+		if h := a.moduleHooks.Providers[i].OnShutdown; h != nil {
+			if err := h(); err != nil {
 				a.opts.logger.Error("OnApplicationShutdown hook failed", logger.Field{Key: "error", Value: err})
+				errs = append(errs, fmt.Errorf("OnApplicationShutdown: %w", err))
 			}
 		}
-		if a.moduleHooks.Providers[i].OnDestroy != nil {
-			if err := a.moduleHooks.Providers[i].OnDestroy(); err != nil {
+		if h := a.moduleHooks.Providers[i].OnDestroy; h != nil {
+			if err := h(); err != nil {
 				a.opts.logger.Error("OnModuleDestroy hook failed", logger.Field{Key: "error", Value: err})
+				errs = append(errs, fmt.Errorf("OnModuleDestroy: %w", err))
 			}
 		}
 	}
 
-	// Execute module-level OnDestroy hooks in reverse order
 	if err := app.ExecuteHooks(a.moduleHooks.OnDestroy, a.opts.logger, "OnModuleDestroy"); err != nil {
 		a.opts.logger.Error("Module OnDestroy hooks failed", logger.Field{Key: "error", Value: err})
+		errs = append(errs, err)
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func (a *App) Container() *di.Container {
