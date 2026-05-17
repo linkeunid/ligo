@@ -102,6 +102,14 @@ If `govulncheck` flags stdlib CVEs, bump Go (e.g. `mise install go@latest`
 then update `go.mod`). Dependency CVEs that don't reach a call path are
 informational; ones in actual call paths block release.
 
+### CI
+
+`.github/workflows/ci.yml` runs three jobs on every push to `main` and on
+every PR: `golangci-lint` (with the shared `.golangci.yml`), `go test
+-race`, and `govulncheck`. infertypeargs drift, unformatted imports,
+unwrapped errors, etc. fail the build before merge. Mirror the same
+workflow into every ligo* repo so the contract stays uniform.
+
 ## Conventions
 
 - Root files are thin re-exports from `internal/` packages — never add logic to root-level files
