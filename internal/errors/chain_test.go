@@ -1,9 +1,43 @@
 package errors
 
 import (
+	stderrors "errors"
 	"strings"
 	"testing"
 )
+
+func TestChainableError_ErrorIncludesRequiredBy(t *testing.T) {
+	e := &ChainableError{Type: "Foo", RequiredBy: "Bar"}
+	if !strings.Contains(e.Error(), "required by Bar") {
+		t.Errorf("missing required-by, got %q", e.Error())
+	}
+}
+
+func TestChainableError_ErrorOmitsRequiredByWhenEmpty(t *testing.T) {
+	e := &ChainableError{Type: "Foo"}
+	if strings.Contains(e.Error(), "required by") {
+		t.Errorf("should omit required-by, got %q", e.Error())
+	}
+}
+
+func TestChainableError_ErrorWithCause(t *testing.T) {
+	inner := stderrors.New("boom")
+	e := &ChainableError{Type: "Foo", Cause: inner}
+	if !strings.Contains(e.Error(), "boom") {
+		t.Errorf("missing cause, got %q", e.Error())
+	}
+}
+
+func TestChainableError_UnwrapTraversesChain(t *testing.T) {
+	inner := stderrors.New("root")
+	e := NewChainableError("Foo", inner).WithRequiredBy("Bar")
+	if !stderrors.Is(e, inner) {
+		t.Error("errors.Is did not traverse Unwrap chain")
+	}
+	if e.RequiredBy != "Bar" {
+		t.Errorf("WithRequiredBy did not set field, got %q", e.RequiredBy)
+	}
+}
 
 func TestFormatChain_CyclicChainTerminates(t *testing.T) {
 	// Build a cyclic chain: A -> B -> A -> B ...

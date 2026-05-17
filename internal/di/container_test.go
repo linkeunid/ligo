@@ -490,3 +490,81 @@ func TestBuild_FactoryErrorCarriesRequiredBy(t *testing.T) {
 		t.Errorf("expected errors.Is(err, factoryErr); chain is %v", err)
 	}
 }
+
+func TestNewChild_InheritsFromParent(t *testing.T) {
+	parent := New()
+	typ := reflect.TypeFor[*testService]()
+	parent.Register(typ, NewEntry(nil, &testService{name: "parent-svc"}, nil, false, false, nil))
+
+	child := parent.NewChild()
+	got, err := Resolve[*testService](child)
+	if err != nil {
+		t.Fatalf("child resolve err: %v", err)
+	}
+	if got.name != "parent-svc" {
+		t.Errorf("child resolved %q, want parent-svc", got.name)
+	}
+}
+
+func TestNewChild_OverridesParent(t *testing.T) {
+	parent := New()
+	typ := reflect.TypeFor[*testService]()
+	parent.Register(typ, NewEntry(nil, &testService{name: "parent-svc"}, nil, false, false, nil))
+
+	child := parent.NewChild()
+	child.Register(typ, NewEntry(nil, &testService{name: "child-svc"}, nil, false, false, nil))
+
+	got, err := Resolve[*testService](child)
+	if err != nil {
+		t.Fatalf("child resolve err: %v", err)
+	}
+	if got.name != "child-svc" {
+		t.Errorf("child override = %q, want child-svc", got.name)
+	}
+
+	// Parent still resolves original.
+	parentGot, _ := Resolve[*testService](parent)
+	if parentGot.name != "parent-svc" {
+		t.Errorf("parent leaked child override = %q", parentGot.name)
+	}
+}
+
+func TestErrMissingDependency_Unwrap(t *testing.T) {
+	root := errors.New("root cause")
+	e := &ErrMissingDependency{Type: "Foo", Cause: root}
+	if !errors.Is(e, root) {
+		t.Error("errors.Is did not traverse Unwrap chain")
+	}
+}
+
+func TestErrCircularDependency_Error(t *testing.T) {
+	e := &ErrCircularDependency{Chain: []string{"A", "B", "A"}}
+	msg := e.Error()
+	if msg == "" {
+		t.Error("empty error message")
+	}
+	for _, want := range []string{"circular", "A", "B"} {
+		if !contains(msg, want) {
+			t.Errorf("missing %q in %q", want, msg)
+		}
+	}
+}
+
+func TestErrAmbiguousDependency_Error(t *testing.T) {
+	e := &ErrAmbiguousDependency{Interface: "io.Reader", Implementors: []string{"*A", "*B"}}
+	msg := e.Error()
+	for _, want := range []string{"ambiguous", "io.Reader", "*A", "*B"} {
+		if !contains(msg, want) {
+			t.Errorf("missing %q in %q", want, msg)
+		}
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
