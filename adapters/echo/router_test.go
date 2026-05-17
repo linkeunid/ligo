@@ -1,8 +1,10 @@
 package echo
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/linkeunid/ligo/internal/di"
 	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
@@ -53,4 +55,38 @@ func TestGroupAdapterGroup(t *testing.T) {
 func TestContextAdapter(t *testing.T) {
 	// Context adapter tests would require a real Echo context
 	// which needs an HTTP test server. Skip for now.
+}
+
+func TestGroupAdapterServeReturnsSentinel(t *testing.T) {
+	a := NewAdapter()
+	g := a.Group("/api")
+	err := g.Serve(":0")
+	if !errors.Is(err, ErrServeOnGroup) {
+		t.Fatalf("expected ErrServeOnGroup, got %v", err)
+	}
+}
+
+func TestSetContainerIdempotent(t *testing.T) {
+	a := NewAdapter()
+	c := di.New()
+
+	a.SetContainer(c)
+	first := len(a.middleware)
+
+	a.SetContainer(c)
+	a.SetContainer(c)
+	if len(a.middleware) != first {
+		t.Fatalf("middleware count grew: first=%d, after extra calls=%d", first, len(a.middleware))
+	}
+}
+
+func TestSetContainerNilDoesNotInstall(t *testing.T) {
+	a := NewAdapter()
+	a.SetContainer(nil)
+	if a.reqScopeInstalled {
+		t.Fatal("nil container should not install request-scope middleware")
+	}
+	if len(a.middleware) != 0 {
+		t.Fatalf("nil container should leave middleware empty, got %d", len(a.middleware))
+	}
 }

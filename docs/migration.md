@@ -19,6 +19,55 @@ This guide helps you migrate your Ligo applications between versions.
 Two behavior changes to plan for, plus two additive APIs. All adjustments
 are mechanical.
 
+### Echo adapter: `SetContainer` is idempotent
+
+Calling `Adapter.SetContainer(c)` more than once used to prepend the
+request-scope middleware on every call. Each repeated call created an
+extra layer of child container per request. The middleware now installs at
+most once per adapter; subsequent calls just rebind the container pointer.
+
+If you relied on the old behavior (unlikely — it was a bug), wrap your own
+container instead.
+
+### Echo adapter: `groupAdapter.Serve` returns `ErrServeOnGroup`
+
+Calling `Serve(addr)` on a route group returned `nil` silently — it
+looked like a successful server start but no server actually started. It
+now returns `echo.ErrServeOnGroup`. Only the root `Adapter` can `Serve`.
+
+```go
+g := router.Group("/api")
+if err := g.Serve(":8080"); errors.Is(err, echo.ErrServeOnGroup) {
+    // programmer error — call Serve on the root router instead
+}
+```
+
+### Echo adapter: per-request context pool removed
+
+The `sync.Pool` of `contextAdapter` allocated through every request because
+nothing ever called `Put`. The pool was pure overhead. Removed; contexts
+are allocated fresh per request. Reintroduce a pool only with paired `Put`
+and measured benchmark wins.
+
+### `MockContext`: `ImATeapot`, `SetBody`, `WithBindError`
+
+`MockContext` was missing `ImATeapot` — using it as a `ligo.Context`
+would fail to compile. Added the method and a compile-time assertion
+(`var _ http.Context = (*MockContext)(nil)`) so future interface drift
+fails the build.
+
+`Bind` and `BindQuery` were silent no-ops, useless for any handler that
+read request data. New helpers:
+
+```go
+m := testing.NewMockContext()
+m.SetBody(CreateUserInput{Name: "alice"})
+// ...
+m.WithBindError(errors.New("malformed JSON"))
+```
+
+Defaults remain no-ops for backwards compatibility with existing tests.
+
 ### Provider hooks now run sequentially by default
 
 `OnInit` and `OnBootstrap` previously fired in parallel goroutines, which

@@ -2,9 +2,11 @@ package testing
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 
 	"github.com/linkeunid/ligo/internal/core/logger"
@@ -12,12 +14,26 @@ import (
 	httpifc "github.com/linkeunid/ligo/internal/http"
 )
 
+// Compile-time assertion that MockContext satisfies the Context interface.
+// If the interface drifts, this fails the build instead of failing silently
+// the moment a test tries to use MockContext as a Context.
+var _ httpifc.Context = (*MockContext)(nil)
+
 // MockContext is a mock implementation of ligo.Context for testing.
+//
+// Bind/BindQuery defaults are no-ops. To drive realistic binding in tests:
+//   - SetBody(v) stashes a value that Bind copies into its target via reflect.
+//   - SetQueryBody(v) does the same for BindQuery.
+//   - WithBindError(err) / WithBindQueryError(err) inject failures.
 type MockContext struct {
-	values  map[string]any
-	req     *http.Request
-	resp    http.ResponseWriter
-	reqCont *di.Container
+	values        map[string]any
+	req           *http.Request
+	resp          http.ResponseWriter
+	reqCont       *di.Container
+	bindBody      any
+	bindErr       error
+	bindQueryBody any
+	bindQueryErr  error
 }
 
 // NewMockContext creates a new mock context for testing.
@@ -81,9 +97,49 @@ func (m *MockContext) QueryInt(key string, def int) int {
 	return n
 }
 
-// BindQuery is a no-op mock — tests should populate the target struct manually.
+// BindQuery copies the stashed query body (see SetQueryBody) into v, or
+// returns the injected error (see WithBindQueryError). With neither set, it
+// is a no-op for backwards compatibility.
 func (m *MockContext) BindQuery(v any) error {
+	if m.bindQueryErr != nil {
+		return m.bindQueryErr
+	}
+	if m.bindQueryBody != nil {
+		return copyInto(v, m.bindQueryBody)
+	}
 	return nil
+}
+
+// SetBody stashes a value that subsequent calls to Bind copy into their
+// target. v should be the same struct type the handler binds.
+func (m *MockContext) SetBody(v any) { m.bindBody = v }
+
+// SetQueryBody stashes a value that subsequent calls to BindQuery copy into
+// their target.
+func (m *MockContext) SetQueryBody(v any) { m.bindQueryBody = v }
+
+// WithBindError configures Bind to return err instead of binding.
+func (m *MockContext) WithBindError(err error) { m.bindErr = err }
+
+// WithBindQueryError configures BindQuery to return err instead of binding.
+func (m *MockContext) WithBindQueryError(err error) { m.bindQueryErr = err }
+
+// copyInto round-trips src through JSON into dst (a pointer). Reflection
+// would require src and dst to share concrete types; JSON tolerates field
+// subsets and is sufficient for test ergonomics.
+func copyInto(dst, src any) error {
+	if dst == nil {
+		return nil
+	}
+	rv := reflect.ValueOf(dst)
+	if rv.Kind() != reflect.Pointer || rv.IsNil() {
+		return nil
+	}
+	b, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, dst)
 }
 
 // Paginate returns a zero-value ListQuery; tests can swap the request to
@@ -97,8 +153,16 @@ func (m *MockContext) Paginate(defaultPerPage, maxPerPage int) httpifc.ListQuery
 	return q
 }
 
-// Bind is a mock implementation that always returns nil.
+// Bind copies the stashed body (see SetBody) into v, or returns the
+// injected error (see WithBindError). With neither set, it is a no-op for
+// backwards compatibility.
 func (m *MockContext) Bind(v any) error {
+	if m.bindErr != nil {
+		return m.bindErr
+	}
+	if m.bindBody != nil {
+		return copyInto(v, m.bindBody)
+	}
 	return nil
 }
 
@@ -154,6 +218,7 @@ func (m *MockContext) PayloadTooLarge(msg ...string) error                      
 func (m *MockContext) UnsupportedMediaType(msg ...string) error                  { return nil }
 func (m *MockContext) UnprocessableEntity(msg ...string) error                   { return nil }
 func (m *MockContext) TooManyRequests(msg ...string) error                       { return nil }
+func (m *MockContext) ImATeapot(msg ...string) error                             { return nil }
 func (m *MockContext) InternalServerError(msg ...string) error                   { return nil }
 func (m *MockContext) NotImplemented(msg ...string) error                        { return nil }
 func (m *MockContext) BadGateway(msg ...string) error                            { return nil }

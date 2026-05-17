@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	echo "github.com/labstack/echo/v5"
@@ -29,8 +28,9 @@ type Adapter struct {
 	logger     logger.Logger
 	// server is written by Serve (in one goroutine) and read by Shutdown
 	// (in another), so the pointer must be published atomically.
-	server    atomic.Pointer[http.Server]
-	container *di.Container
+	server            atomic.Pointer[http.Server]
+	container         *di.Container
+	reqScopeInstalled bool
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -43,12 +43,15 @@ func NewAdapter() *Adapter {
 	}
 }
 
-// SetContainer sets the root DI container for request-scoped DI.
+// SetContainer sets the root DI container for request-scoped DI. The
+// request-scope middleware is installed at most once per adapter — repeated
+// calls just rebind the container without prepending another middleware
+// (otherwise every call would nest one more child container per request).
 func (a *Adapter) SetContainer(c *di.Container) {
 	a.container = c
-	// Add request scope middleware if container is set
-	if c != nil {
+	if c != nil && !a.reqScopeInstalled {
 		a.middleware = append([]httpifc.Middleware{a.requestScopeMiddleware()}, a.middleware...)
+		a.reqScopeInstalled = true
 	}
 }
 
@@ -152,8 +155,14 @@ func (g *groupAdapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc
 	return wrapHandlerWithMiddleware(g.middleware, handler)
 }
 
+// ErrServeOnGroup is returned by groupAdapter.Serve. Calling Serve on a
+// route group is a programmer error — only the root router can start a
+// server. Returning an explicit sentinel beats the previous silent-success
+// behavior which made misuse undetectable.
+var ErrServeOnGroup = errors.New("ligo: cannot Serve on a route group; call Serve on the root router")
+
 func (g *groupAdapter) Serve(addr string) error {
-	return nil
+	return ErrServeOnGroup
 }
 
 // wrapHandlerWithMiddleware applies middleware chain to handler.
@@ -170,23 +179,15 @@ type contextAdapter struct {
 	reqCont *di.Container
 }
 
-var contextPool = sync.Pool{
-	New: func() any {
-		return &contextAdapter{
-			values: make(map[string]any),
-		}
-	},
-}
-
+// newContextAdapter allocates a fresh adapter per request. A sync.Pool used
+// to live here but Get was never paired with Put, so the pool's hit rate was
+// zero — pure overhead. If allocation shows up in profiles, reintroduce a
+// pool with paired Put under measured benchmarks.
 func newContextAdapter(c *echo.Context) *contextAdapter {
-	ctx := contextPool.Get().(*contextAdapter)
-	ctx.c = c
-	// Reset values map to avoid leaking data between requests
-	for k := range ctx.values {
-		delete(ctx.values, k)
+	return &contextAdapter{
+		c:      c,
+		values: make(map[string]any),
 	}
-	ctx.reqCont = nil
-	return ctx
 }
 
 func (ca *contextAdapter) Request() *http.Request {
