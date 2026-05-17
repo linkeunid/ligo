@@ -261,7 +261,7 @@ func (a *App) executeProviderHooks(getHook func(*lifecycle.Hooks) func() error) 
 func executeProviderHooksSequential(providers []lifecycle.Hooks, getHook func(*lifecycle.Hooks) func() error) error {
 	for i := range providers {
 		if providers[i].HasRegistry() {
-			providers[i] = providers[i].Refresh()
+			providers[i].Refresh()
 		}
 		hook := getHook(&providers[i])
 		if hook == nil {
@@ -280,7 +280,7 @@ func executeProviderHooksParallel(providers []lifecycle.Hooks, getHook func(*lif
 	var tasks []hookTask
 	for i := range providers {
 		if providers[i].HasRegistry() {
-			providers[i] = providers[i].Refresh()
+			providers[i].Refresh()
 		}
 		if hook := getHook(&providers[i]); hook != nil {
 			tasks = append(tasks, hookTask{provider: &providers[i], hook: hook})
@@ -358,7 +358,7 @@ func (a *App) shutdown() error {
 	for i := len(a.moduleHooks.Providers) - 1; i >= 0; i-- {
 		// Only refresh if registry exists (HookedFactory pattern where RegisterFrom may have been called during resolution)
 		if a.moduleHooks.Providers[i].HasRegistry() {
-			a.moduleHooks.Providers[i] = a.moduleHooks.Providers[i].Refresh()
+			a.moduleHooks.Providers[i].Refresh()
 		}
 		if h := a.moduleHooks.Providers[i].OnBeforeShutdown; h != nil {
 			if err := h(); err != nil {

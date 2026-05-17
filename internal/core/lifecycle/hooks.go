@@ -44,17 +44,18 @@ type Hooks struct {
 	registry         *HookRegistry // Optional: reference to registry for dynamic hook refresh
 }
 
-// Refresh updates hooks from the registry if it exists and returns the updated hooks.
-// This is called after RegisterFrom to get hooks registered via the Register method.
-func (h Hooks) Refresh() Hooks {
-	if h.registry != nil {
-		h.OnInit = h.registry.onInit
-		h.OnBootstrap = h.registry.onBootstrap
-		h.OnBeforeShutdown = h.registry.beforeShutdown
-		h.OnDestroy = h.registry.onDestroy
-		h.OnShutdown = h.registry.onShutdown
+// Refresh pulls the latest hooks from the registry into h. Pointer receiver
+// so a bare `h.Refresh()` call mutates in place — a value receiver here
+// silently no-ops on a discarded return value, which the old API allowed.
+func (h *Hooks) Refresh() {
+	if h.registry == nil {
+		return
 	}
-	return h
+	h.OnInit = h.registry.onInit
+	h.OnBootstrap = h.registry.onBootstrap
+	h.OnBeforeShutdown = h.registry.beforeShutdown
+	h.OnDestroy = h.registry.onDestroy
+	h.OnShutdown = h.registry.onShutdown
 }
 
 // HasRegistry returns true if the hooks have an associated registry (for HookedFactory pattern).

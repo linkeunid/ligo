@@ -46,26 +46,3 @@ func (p *Pool[T]) Put(v T) {
 	}
 	p.pool.Put(v)
 }
-
-// ContextPool is a specialized pool for context-like objects that need reset.
-type ContextPool[T any] struct {
-	pool *Pool[T]
-}
-
-// NewContextPool creates a new context pool with factory and reset functions.
-// The reset function should clear any state that might leak between requests.
-func NewContextPool[T any](factory func() T, reset func(T)) *ContextPool[T] {
-	return &ContextPool[T]{
-		pool: NewPoolWithReset(factory, reset),
-	}
-}
-
-// Get retrieves a value from the context pool.
-func (cp *ContextPool[T]) Get() T {
-	return cp.pool.Get()
-}
-
-// Put returns a value to the context pool after resetting it.
-func (cp *ContextPool[T]) Put(v T) {
-	cp.pool.Put(v)
-}

@@ -36,33 +36,6 @@ func ExtractTypeName(v any) string {
 	return typ.Name()
 }
 
-// ExtractTypeNameFromFunc extracts the type name from a function's return type.
-// If the function has no return type, returns the function name.
-func ExtractTypeNameFromFunc(fn any) string {
-	if fn == nil {
-		return "unknown"
-	}
-
-	typ := reflect.TypeOf(fn)
-	if typ.Kind() != reflect.Func {
-		return "unknown"
-	}
-
-	// Try to get name from return type
-	if typ.NumOut() > 0 {
-		retType := typ.Out(0)
-		if retType.Kind() == reflect.Ptr {
-			retType = retType.Elem()
-		}
-		if retType.Name() != "" {
-			return retType.Name()
-		}
-	}
-
-	// Fallback to function name
-	return typ.Name()
-}
-
 // IsPointerType checks if the given value is a pointer.
 func IsPointerType(v any) bool {
 	if v == nil {

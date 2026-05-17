@@ -3,8 +3,6 @@ package logger
 import (
 	"log/slog"
 	"os"
-
-	reflectutil "github.com/linkeunid/ligo/internal/reflect"
 )
 
 // Context represents the internal component that generated the log.
@@ -177,9 +175,3 @@ func (noopLogger) Warn(string, ...Field)                    {}
 func (noopLogger) Error(string, ...Field)                   {}
 func (noopLogger) LogWithContext(Context, string, ...Field) {}
 func (noopLogger) SetDebug(bool)                            {}
-
-// ExtractProviderName extracts a clean name from a provider type or factory function.
-// Deprecated: Use reflectutil.ExtractTypeName instead for better consistency.
-func ExtractProviderName(fn any) string {
-	return reflectutil.ExtractTypeName(fn)
-}

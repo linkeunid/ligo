@@ -405,6 +405,33 @@ func TestInterfaceTypeAssertions(t *testing.T) {
 	})
 }
 
+func TestHooksRefresh_MutatesInPlace(t *testing.T) {
+	reg := NewHookRegistry()
+	called := false
+	reg.OnInit(func() error { called = true; return nil })
+
+	h := reg.ToHooks()
+	// Simulate the registry being mutated after ToHooks (HookedFactory pattern).
+	reg.OnInit(func() error { called = true; return errors.New("post-refresh") })
+
+	h.Refresh() // no assignment — pointer receiver must mutate in place
+	if h.OnInit == nil {
+		t.Fatal("Refresh did not populate OnInit on receiver")
+	}
+	if err := h.OnInit(); err == nil || err.Error() != "post-refresh" {
+		t.Errorf("expected post-refresh err, got %v", err)
+	}
+	_ = called
+}
+
+func TestHooksRefresh_NoRegistryIsNoop(t *testing.T) {
+	h := Hooks{}
+	h.Refresh()
+	if h.OnInit != nil {
+		t.Error("Refresh on empty Hooks should not set OnInit")
+	}
+}
+
 func TestNilProviderHandling(t *testing.T) {
 	t.Run("nil provider does not implement any hooks", func(t *testing.T) {
 		var p any = nil

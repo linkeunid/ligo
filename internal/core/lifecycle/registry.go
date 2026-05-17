@@ -3,7 +3,14 @@ package lifecycle
 // HookFunc represents a lifecycle hook function.
 type HookFunc func() error
 
-// HookRegistry stores lifecycle hooks with their associated type.
+// HookRegistry stores lifecycle hooks for a single provider or controller.
+//
+// Note: HookRegistry's OnInit/OnBootstrap/.../OnDestroy methods OVERWRITE
+// the previous value — a registry can hold one hook per stage. This differs
+// from ModuleHookRegistry's OnInit/OnDestroy, which APPEND multiple hooks
+// at the module level. Same method names, different semantics by design:
+// providers register a single lifecycle method each, while a module
+// aggregates many.
 type HookRegistry struct {
 	onInit         HookFunc
 	onBootstrap    HookFunc
@@ -87,17 +94,12 @@ func (r *HookRegistry) ToHooks() Hooks {
 	}
 }
 
-// GetInitHooks returns the collected OnInit hooks for module-level use.
-func (r *ModuleHookRegistry) GetInitHooks() []func() error {
-	return r.onInit
-}
-
-// GetDestroyHooks returns the destroy hooks as a slice (for module-level use).
-func (r *ModuleHookRegistry) GetDestroyHooks() []func() error {
-	return r.onDestroy
-}
-
 // ModuleHookRegistry stores module-level lifecycle hooks.
+//
+// Note: ModuleHookRegistry's OnInit/OnDestroy methods APPEND — a module
+// can register many hooks at each stage. This differs from HookRegistry's
+// OnInit/.../OnDestroy methods which OVERWRITE (single hook per stage).
+// See HookRegistry's doc comment for the rationale.
 type ModuleHookRegistry struct {
 	onInit    []func() error
 	onDestroy []func() error
@@ -118,4 +120,14 @@ func (r *ModuleHookRegistry) OnInit(fn func() error) *ModuleHookRegistry {
 func (r *ModuleHookRegistry) OnDestroy(fn func() error) *ModuleHookRegistry {
 	r.onDestroy = append(r.onDestroy, fn)
 	return r
+}
+
+// GetInitHooks returns the collected OnInit hooks for module-level use.
+func (r *ModuleHookRegistry) GetInitHooks() []func() error {
+	return r.onInit
+}
+
+// GetDestroyHooks returns the destroy hooks as a slice (for module-level use).
+func (r *ModuleHookRegistry) GetDestroyHooks() []func() error {
+	return r.onDestroy
 }

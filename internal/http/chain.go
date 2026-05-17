@@ -12,55 +12,42 @@ type ChainRouter interface {
 	HEAD(path string, handlers ...HandlerFunc) RouteBuilder
 }
 
+// chainRouter embeds Router so that Router methods (Group/Use/Handle/Serve)
+// are forwarded automatically. Adding a method to the Router interface no
+// longer silently breaks this wrapper.
 type chainRouter struct {
-	router Router
+	Router
 }
 
 // NewChainRouter wraps a Router with chain methods.
 func NewChainRouter(router Router) ChainRouter {
-	return &chainRouter{router: router}
-}
-
-func (cr *chainRouter) Group(prefix string) Router {
-	return cr.router.Group(prefix)
-}
-
-func (cr *chainRouter) Use(middleware ...Middleware) {
-	cr.router.Use(middleware...)
-}
-
-func (cr *chainRouter) Handle(method, path string, handler HandlerFunc) {
-	cr.router.Handle(method, path, handler)
-}
-
-func (cr *chainRouter) Serve(addr string) error {
-	return cr.router.Serve(addr)
+	return &chainRouter{Router: router}
 }
 
 func (cr *chainRouter) GET(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "GET", path, handlers...)
+	return newRouteBuilder(cr.Router, "GET", path, handlers...)
 }
 
 func (cr *chainRouter) POST(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "POST", path, handlers...)
+	return newRouteBuilder(cr.Router, "POST", path, handlers...)
 }
 
 func (cr *chainRouter) PUT(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "PUT", path, handlers...)
+	return newRouteBuilder(cr.Router, "PUT", path, handlers...)
 }
 
 func (cr *chainRouter) DELETE(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "DELETE", path, handlers...)
+	return newRouteBuilder(cr.Router, "DELETE", path, handlers...)
 }
 
 func (cr *chainRouter) PATCH(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "PATCH", path, handlers...)
+	return newRouteBuilder(cr.Router, "PATCH", path, handlers...)
 }
 
 func (cr *chainRouter) OPTIONS(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "OPTIONS", path, handlers...)
+	return newRouteBuilder(cr.Router, "OPTIONS", path, handlers...)
 }
 
 func (cr *chainRouter) HEAD(path string, handlers ...HandlerFunc) RouteBuilder {
-	return newRouteBuilder(cr.router, "HEAD", path, handlers...)
+	return newRouteBuilder(cr.Router, "HEAD", path, handlers...)
 }

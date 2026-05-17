@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 	"sync/atomic"
+	"syscall"
 
 	echo "github.com/labstack/echo/v5"
 
@@ -94,12 +93,8 @@ func (a *Adapter) Serve(addr string) error {
 	srv := &http.Server{Addr: addr, Handler: a.e}
 	a.server.Store(srv)
 	err := srv.ListenAndServe()
-	if err != nil {
-		// Check for "address already in use" errors
-		var opErr *net.OpError
-		if errors.As(err, &opErr) && (opErr.Op == "listen" || strings.Contains(opErr.Error(), "address already in use") || strings.Contains(opErr.Error(), "EADDRINUSE")) {
-			return fmt.Errorf("%w: %w", app.ErrAddrInUse, err)
-		}
+	if err != nil && errors.Is(err, syscall.EADDRINUSE) {
+		return fmt.Errorf("%w: %w", app.ErrAddrInUse, err)
 	}
 	return err
 }

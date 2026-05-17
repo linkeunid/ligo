@@ -11,6 +11,7 @@ import (
 	"github.com/linkeunid/ligo/internal/core/module"
 	"github.com/linkeunid/ligo/internal/di"
 	errutil "github.com/linkeunid/ligo/internal/errors"
+	reflectutil "github.com/linkeunid/ligo/internal/reflect"
 )
 
 // unwrapController extracts the underlying constructor and whether it was wrapped.
@@ -193,7 +194,7 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 
 // extractControllerName extracts the controller name from the constructor.
 func (b *Binder) extractControllerName(fn any) string {
-	name := logger.ExtractProviderName(fn)
+	name := reflectutil.ExtractTypeName(fn)
 	if name == "unknown" || name == "" {
 		return "Controller"
 	}

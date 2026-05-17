@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/linkeunid/ligo/internal/core/logger"
+	reflectutil "github.com/linkeunid/ligo/internal/reflect"
 )
 
 // Container holds registered providers and resolves dependencies.
@@ -76,9 +77,9 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	}
 	c.providers[typ] = entry
 
-	name := logger.ExtractProviderName(entry.eager)
+	name := reflectutil.ExtractTypeName(entry.eager)
 	if name == "unknown" && entry.factory != nil {
-		name = logger.ExtractProviderName(entry.factory)
+		name = reflectutil.ExtractTypeName(entry.factory)
 	}
 	c.logger.Debug("Provider registered", logger.Field{Key: "name", Value: name})
 }

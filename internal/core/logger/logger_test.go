@@ -114,29 +114,6 @@ func TestSetDebug(t *testing.T) {
 	l.Debug("debug message when disabled")
 }
 
-func TestExtractProviderName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    any
-		expected string
-	}{
-		{"nil", nil, "unknown"},
-		{"string", "test", "string"},
-		{"struct", struct{ Name string }{Name: "test"}, ""},
-		{"pointer to struct", &struct{ Name string }{Name: "test"}, ""},
-		{"function returning struct", func() *struct{ Name string } { return nil }, ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ExtractProviderName(tt.input)
-			if tt.expected != "" && result != tt.expected {
-				t.Errorf("ExtractProviderName() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestLoggerOutput(t *testing.T) {
 	var buf bytes.Buffer
 	l := &SlogLogger{

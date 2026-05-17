@@ -19,6 +19,38 @@ This guide helps you migrate your Ligo applications between versions.
 Two behavior changes to plan for, plus two additive APIs. All adjustments
 are mechanical.
 
+### `Hooks.Refresh()` now mutates in place
+
+`Hooks.Refresh()` used to have a value receiver and return the mutated
+copy. Discarding the return value — `h.Refresh()` — silently no-opped.
+It now has a pointer receiver and returns nothing:
+
+```go
+// before — discarded return = silent no-op
+h.Refresh()
+
+// before — explicit assignment
+h = h.Refresh()
+
+// after — single form, always mutates in place
+h.Refresh()
+```
+
+Code that did `h = h.Refresh()` must drop the assignment. Code that
+already wrote `h.Refresh()` now starts working as intended.
+
+### Deprecated helpers removed
+
+Pre-v1.0 dead code cleanup:
+
+- `logger.ExtractProviderName` → use `reflectutil.ExtractTypeName`. The
+  former was a thin shim already marked deprecated.
+- `reflectutil.ExtractTypeNameFromFunc` → use `reflectutil.ExtractTypeName`,
+  which handles funcs.
+- `pool.ContextPool` / `pool.NewContextPool` → use `pool.Pool` /
+  `pool.NewPoolWithReset` directly. `ContextPool` was a zero-behavior
+  wrapper.
+
 ### Graceful shutdown errors are now joined and returned
 
 `ServeWithRetry` / `serveWithGracefulShutdownAt` used to log and discard
