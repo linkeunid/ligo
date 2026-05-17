@@ -34,9 +34,16 @@ func IncrementPort(addr string) (string, error) {
 	return net.JoinHostPort(host, strconv.Itoa(portNum)), nil
 }
 
-// IsAddrInUse checks if the error is due to address already in use.
+// IsAddrInUse checks if the error is due to address already in use. It
+// recognizes both the framework sentinel (ErrAddrInUse — adapters are
+// contracted to wrap with this) and the raw OS-level error
+// (syscall.EADDRINUSE wrapped in *net.OpError) so AutoPort still works if
+// a future adapter forgets to translate.
 func IsAddrInUse(err error) bool {
-	return errors.Is(err, ErrAddrInUse)
+	if errors.Is(err, ErrAddrInUse) {
+		return true
+	}
+	return errors.Is(err, syscall.EADDRINUSE)
 }
 
 // ServeOptions holds options for serving.
@@ -117,11 +124,17 @@ func serveWithGracefulShutdownAt(addr string, opts ServeOptions) error {
 		ctx, cancel := context.WithTimeout(context.Background(), opts.GracefulTimeout)
 		defer cancel()
 
+		// Collect every shutdown error and join them. Logging stays so
+		// operators see failures in real time; the joined error lets the
+		// binary's main exit non-zero on partial shutdown.
+		var errs []error
+
 		if opts.AppShutdown != nil {
 			if err := opts.AppShutdown(); err != nil {
 				if opts.Logger != nil {
 					opts.Logger.Error("App shutdown failed", logger.Field{Key: "error", Value: err})
 				}
+				errs = append(errs, fmt.Errorf("app shutdown: %w", err))
 			}
 		}
 
@@ -130,15 +143,16 @@ func serveWithGracefulShutdownAt(addr string, opts ServeOptions) error {
 				if opts.Logger != nil {
 					opts.Logger.Error("OnStop hook failed", logger.Field{Key: "error", Value: err})
 				}
+				errs = append(errs, fmt.Errorf("OnStop hook: %w", err))
 			}
 		}
 
 		if gs, ok := opts.Router.(http.GracefulServer); ok {
 			if err := gs.Shutdown(ctx); err != nil {
-				return err
+				errs = append(errs, fmt.Errorf("router shutdown: %w", err))
 			}
 		}
-		return nil
+		return errors.Join(errs...)
 	case err := <-errChan:
 		return err
 	}

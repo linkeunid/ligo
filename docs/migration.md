@@ -19,6 +19,37 @@ This guide helps you migrate your Ligo applications between versions.
 Two behavior changes to plan for, plus two additive APIs. All adjustments
 are mechanical.
 
+### Graceful shutdown errors are now joined and returned
+
+`ServeWithRetry` / `serveWithGracefulShutdownAt` used to log and discard
+errors from `AppShutdown()`, each `OnStop` hook, and the router's
+`Shutdown(ctx)`. The function returned `nil` even when destruction
+partially failed.
+
+It now collects every shutdown error and returns `errors.Join(...)`.
+Logging is unchanged — operators still see real-time failures — but the
+binary's `main` can now `os.Exit(1)` when destruction is incomplete:
+
+```go
+if err := app.Run(); err != nil {
+    log.Error("shutdown failed", "err", err)
+    os.Exit(1)
+}
+```
+
+Each component's error is wrapped with a kind prefix
+(`app shutdown:`, `OnStop hook:`, `router shutdown:`) so `errors.Is` /
+`errors.As` still work on the underlying sentinels.
+
+### `IsAddrInUse` recognizes raw `syscall.EADDRINUSE`
+
+Previously it only matched the `ErrAddrInUse` sentinel that the Echo
+adapter wraps explicitly. A future adapter (or the same one under a
+different Go version) that returned the raw OS error caused `AutoPort`
+to silently no-op on port collisions. `IsAddrInUse` now also returns
+true for `errors.Is(err, syscall.EADDRINUSE)` so any adapter's
+listen-conflict error makes auto-port retry work.
+
 ### Echo adapter: `SetContainer` is idempotent
 
 Calling `Adapter.SetContainer(c)` more than once used to prepend the
