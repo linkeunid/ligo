@@ -127,6 +127,10 @@ func (a *App) Run() error {
 	}
 	a.moduleHooks.Providers = append(a.moduleHooks.Providers, controllerHooks...)
 
+	if err := a.resolveEagerProviders(root); err != nil {
+		return err
+	}
+
 	if err := a.executeStartupHooks(); err != nil {
 		return err
 	}
@@ -197,6 +201,18 @@ func (a *App) bindControllers(root *di.Container, router http.Router, expandedMo
 		return nil, err
 	}
 	return controllerHooks, nil
+}
+
+// resolveEagerProviders instantiates providers flagged via HookedSingleton
+// even when no other provider depends on them. This forces RegisterFrom to
+// run so their explicit hooks attach before OnInit / OnBootstrap fire.
+func (a *App) resolveEagerProviders(root *di.Container) error {
+	for _, typ := range a.moduleHooks.EagerTypes {
+		if _, err := di.ResolveByType(root, typ); err != nil {
+			return fmt.Errorf("ligo: eager resolve %s: %w", typ, err)
+		}
+	}
+	return nil
 }
 
 // executeStartupHooks runs OnStart, OnInit, and OnBootstrap hooks.

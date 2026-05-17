@@ -34,8 +34,8 @@ HTTP router adapter implementations and proposals.
 - Chi (Proposed)
 - Stdlib (Proposed)
 
-### [0.6 Release](./1.0-release.md)
-Completed checklist for the v0.6.0 release.
+### [0.9 Release](./1.0-release.md)
+Completed checklist for the v0.9.0 release.
 - Documentation requirements ✅
 - Testing coverage goals ✅
 - Stability guarantees ✅

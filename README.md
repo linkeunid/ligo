@@ -4,10 +4,10 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.21+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-207%20passing-brightgreen)](https://github.com/linkeunid/ligo)
-[![Coverage](https://img.shields.io/badge/coverage-48.9%25-yellow)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-211%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Coverage](https://img.shields.io/badge/coverage-47.3%25-yellow)](https://github.com/linkeunid/ligo)
 
-> **Note:** Ligo **v0.6.0** is available. See the [Release Notes](docs/migration.md) for details.
+> **Note:** Ligo **v0.9.0** is available. See the [Release Notes](docs/migration.md) for details.
 
 ## Features
 
@@ -24,11 +24,11 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 ## Installation
 
 ```bash
-# Get the latest version (v0.6.0)
+# Get the latest version (v0.9.0)
 go get github.com/linkeunid/ligo@latest
 
 # Or specify a version
-go get github.com/linkeunid/ligo@v0.6.0
+go get github.com/linkeunid/ligo@v0.9.0
 ```
 
 ## Quick Start

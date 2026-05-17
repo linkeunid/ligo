@@ -31,6 +31,32 @@ func TestFactoryProvider(t *testing.T) {
 	}
 }
 
+func TestHookedFactoryProvider(t *testing.T) {
+	p := HookedFactory[*testService](func() *testService { return &testService{} })
+	if p.Type() == nil {
+		t.Fatal("expected non-nil type")
+	}
+	if p.Hooks() == nil {
+		t.Fatal("expected non-nil hook registry on HookedFactory")
+	}
+	if p.IsEagerResolve() {
+		t.Error("HookedFactory should not be eagerly resolved")
+	}
+}
+
+func TestHookedSingletonProvider(t *testing.T) {
+	p := HookedSingleton[*testService](func() *testService { return &testService{} })
+	if p.Type() == nil {
+		t.Fatal("expected non-nil type")
+	}
+	if p.Hooks() == nil {
+		t.Fatal("expected non-nil hook registry on HookedSingleton")
+	}
+	if !p.IsEagerResolve() {
+		t.Error("HookedSingleton must be marked for eager resolution")
+	}
+}
+
 func TestTransientProvider(t *testing.T) {
 	p := Transient[*testService](func() *testService {
 		return &testService{}

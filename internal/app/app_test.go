@@ -37,6 +37,10 @@ func (m *mockProvider) IsExported() bool {
 	return m.isExported
 }
 
+func (m *mockProvider) IsEagerResolve() bool {
+	return false
+}
+
 func (m *mockProvider) Fn() func() string {
 	return func() string { return "test" }
 }

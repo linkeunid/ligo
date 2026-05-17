@@ -12,12 +12,13 @@ import (
 // Provider represents a dependency provider that can be registered
 // in the DI di. Providers can be eager values or factory functions.
 type Provider struct {
-	typ       reflect.Type
-	fn        any // raw factory function
-	eager     any
-	transient bool
-	exported  bool
-	hooks     *lifecycle.HookRegistry
+	typ          reflect.Type
+	fn           any // raw factory function
+	eager        any
+	transient    bool
+	exported     bool
+	eagerResolve bool
+	hooks        *lifecycle.HookRegistry
 }
 
 // Value registers a pre-built instance as a singleton.
@@ -120,6 +121,28 @@ func HookedFactory[T any](fn any) Provider {
 	return Factory[T](fn, WithHooks())
 }
 
+// HookedSingleton is like [HookedFactory] but marks the provider for eager
+// resolution at application startup. Use it for providers whose only purpose
+// is to attach lifecycle hooks (RPC handler registrations, background
+// workers, schedulers) — where nothing else in the DI graph depends on the
+// type, so a plain [HookedFactory] would never be instantiated and its
+// Register method would never fire.
+//
+// Example:
+//
+//	// OrderMessaging only exists to bind RPC handlers in OnBootstrap. No
+//	// other provider depends on it, so HookedFactory would be a no-op.
+//	ligo.HookedSingleton[*OrderMessaging](NewOrderMessaging)
+//
+// Eager providers are resolved after all modules have been built and before
+// any OnInit / OnBootstrap hook executes, so their dependencies (and the
+// hooks they register) participate normally in the lifecycle.
+func HookedSingleton[T any](fn any) Provider {
+	p := Factory[T](fn, WithHooks())
+	p.eagerResolve = true
+	return p
+}
+
 // Type returns the type this provider produces.
 func (p Provider) Type() reflect.Type {
 	return p.typ
@@ -134,6 +157,12 @@ func (p Provider) IsExported() bool {
 // IsTransient returns true if the provider creates new instances per resolve.
 func (p Provider) IsTransient() bool {
 	return p.transient
+}
+
+// IsEagerResolve returns true if the provider should be resolved at startup
+// even when nothing else in the DI graph depends on it. Set by [HookedSingleton].
+func (p Provider) IsEagerResolve() bool {
+	return p.eagerResolve
 }
 
 // Export marks a provider as exported, making it visible to sibling modules.

@@ -39,7 +39,8 @@ Ligo is inspired by NestJS. This document tracks which NestJS concepts have been
 | `BeforeApplicationShutdown` | Interface method or explicit hook registration |
 | `OnApplicationShutdown` | Interface method or explicit hook registration |
 | `OnModuleDestroy` | Interface method or explicit hook registration |
-| Compile-time safe hook registration | `HookedFactory[T]()`, `HookedController()` with `Register(*HookRegistry)` |
+| Compile-time safe hook registration | `HookedFactory[T]()`, `HookedSingleton[T]()`, `HookedController()` with `Register(*HookRegistry)` |
+| Eagerly resolved hook-only providers | `HookedSingleton[T]()` — resolved at startup regardless of DI graph dependencies |
 | Parallel hook execution | Goroutines + WaitGroup (~50% faster startup/shutdown) |
 
 ### HTTP
@@ -120,7 +121,7 @@ NestJS uses TypeScript decorators. Ligo uses Go-idiomatic equivalents:
 
 ```
 Available now:
-github.com/linkeunid/ligo            ← Core framework (v0.6.0) ✅
+github.com/linkeunid/ligo            ← Core framework (v0.9.0) ✅
 github.com/linkeunid/ligo-cli        ← CLI scaffolding tool ✅
 github.com/linkeunid/ligo-boilerplate← Starter project ✅
 github.com/linkeunid/ligo-memory     ← In-memory store (dev/testing) ✅

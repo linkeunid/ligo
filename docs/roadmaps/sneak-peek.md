@@ -55,7 +55,9 @@ func Module() ligo.Module {
             }),
         ),
         ligo.Providers(
-            ligo.HookedFactory[*OrderService](NewOrderService),
+            // HookedSingleton because nothing else depends on *OrderService —
+            // it exists only to attach broker handlers during OnBootstrap.
+            ligo.HookedSingleton[*OrderService](NewOrderService),
         ),
     )
 }
@@ -149,7 +151,9 @@ func Module() ligo.Module {
 Cron jobs and interval tasks as lifecycle-managed providers.
 
 ```go
-ligo.HookedFactory[*ReportScheduler](NewReportScheduler)
+// HookedSingleton — no other provider depends on the scheduler, so eager
+// resolution is needed to make sure Start fires on OnBootstrap.
+ligo.HookedSingleton[*ReportScheduler](NewReportScheduler)
 
 func (s *ReportScheduler) Register(r *ligo.HookRegistry) {
     r.OnBootstrap(s.Start)

@@ -6,6 +6,40 @@ This guide helps you migrate your Ligo applications between versions.
 
 ## [Migration Guide: 0.5 → 0.6](#05-→-06)
 
+## [Migration Guide: 0.8 → 0.9](#08-→-09)
+
+---
+
+## 0.8 → 0.9
+
+### New: `HookedSingleton[T]`
+
+`HookedFactory[T]` is lazy — the factory only runs when something else in
+the DI graph resolves the type. For providers whose only purpose is to
+attach lifecycle hooks (RPC handler registrations, schedulers, background
+workers) there is no consumer, so the factory never runs and `Register`
+never fires. Previously the only workarounds were injecting an unused
+dependency into a controller or putting the registration inside a
+module-level `OnInit`.
+
+`HookedSingleton[T]` solves this directly: same semantics as
+`HookedFactory` but resolved eagerly at startup, before any `OnInit` /
+`OnBootstrap` hook executes.
+
+```go
+// Before — *OrderMessaging never instantiated, Register never called,
+// queue bindings never set up.
+ligo.HookedFactory[*OrderMessaging](NewOrderMessaging)
+
+// After — eagerly resolved at startup, Register fires, OnBootstrap binds
+// the broker handlers.
+ligo.HookedSingleton[*OrderMessaging](NewOrderMessaging)
+```
+
+No breaking changes — existing `HookedFactory` usage continues to work
+unchanged. Switch to `HookedSingleton` only for providers that are
+"register-only" with no other DI consumer.
+
 ---
 
 ## 0.x → 0.5

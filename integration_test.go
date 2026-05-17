@@ -1193,6 +1193,52 @@ func TestExplicitHookRegistration(t *testing.T) {
 	})
 }
 
+// TestHookedSingleton_EagerResolve verifies that providers registered via
+// HookedSingleton get instantiated at startup even when nothing depends on
+// them — so their Register method runs and OnInit fires. A plain
+// HookedFactory in the same position would never be resolved and would
+// silently skip its hooks.
+func TestHookedSingleton_EagerResolve(t *testing.T) {
+	t.Run("singleton with no consumer still registers and runs OnInit", func(t *testing.T) {
+		var initCalled, shutdownCalled atomic.Bool
+
+		// Note: nothing in the DI graph depends on *TestDatabase. With
+		// HookedFactory this would be dead code; HookedSingleton forces it.
+		testModule := ligo.NewModule("test",
+			ligo.Providers(
+				ligo.HookedSingleton[*TestDatabase](func() *TestDatabase {
+					return &TestDatabase{
+						initCalled:    &initCalled,
+						shutdownCalled: &shutdownCalled,
+					}
+				}),
+			),
+		)
+
+		app := ligo.New()
+		app.Register(testModule)
+
+		errCh := make(chan error, 1)
+		go func() { errCh <- app.Run() }()
+
+		time.Sleep(200 * time.Millisecond)
+
+		if !initCalled.Load() {
+			t.Error("HookedSingleton OnInit was not called — eager resolution failed")
+		}
+
+		process, _ := os.FindProcess(os.Getpid())
+		if err := process.Signal(os.Interrupt); err != nil {
+			t.Fatalf("failed to send interrupt signal: %v", err)
+		}
+		<-errCh
+
+		if !shutdownCalled.Load() {
+			t.Error("HookedSingleton OnShutdown was not called")
+		}
+	})
+}
+
 // TestHookedFactory_RegisterMethod tests the HookedFactory pattern where services
 // explicitly register their hooks via a Register method, enabling compile-time safety.
 func TestHookedFactory_RegisterMethod(t *testing.T) {

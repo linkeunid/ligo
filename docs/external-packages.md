@@ -499,7 +499,7 @@ module github.com/linkeunid/ligo-cache-redis
 go 1.21
 
 require (
-    github.com/linkeunid/ligo v0.6.0  // Core framework
+    github.com/linkeunid/ligo v0.9.0  // Core framework
     github.com/redis/go-redis/v9 v9.0.0
 )
 ```

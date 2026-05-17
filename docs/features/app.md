@@ -124,6 +124,50 @@ ligo.Providers(
 )
 ```
 
+#### Providers (HookedSingleton — eager-resolved)
+
+`HookedFactory` is lazy: the provider is constructed only when something
+else in the DI graph asks for it. For services whose only reason to exist
+is to attach lifecycle hooks (RPC handler registrations, background
+workers, schedulers, metrics exporters) there is no consumer — so without
+intervention the factory never runs and the hooks silently never fire.
+
+`ligo.HookedSingleton[T]` is the same as `HookedFactory` but is resolved
+eagerly at startup before any `OnInit` / `OnBootstrap` hook executes:
+
+```go
+type OrderMessaging struct {
+    broker *Broker
+    uc     *OrderUseCase
+}
+
+func NewOrderMessaging(broker *Broker, uc *OrderUseCase) *OrderMessaging {
+    return &OrderMessaging{broker: broker, uc: uc}
+}
+
+func (m *OrderMessaging) Register(r *ligo.HookRegistry) {
+    r.OnBootstrap(func() error {
+        // Bind RPC handlers — no one calls these methods directly,
+        // they are wired into the broker by the registration.
+        microservices.Handle(m.broker, "orders.create", m.handleCreate)
+        microservices.On(m.broker, "order.created", m.onCreated)
+        return nil
+    })
+}
+
+// HookedFactory here would do nothing because no controller / service
+// depends on *OrderMessaging. HookedSingleton forces resolution so
+// Register runs and the broker actually gets bindings.
+ligo.Providers(
+    ligo.HookedSingleton[*OrderMessaging](NewOrderMessaging),
+)
+```
+
+Rule of thumb: reach for `HookedSingleton` when the type would be dead
+code in the DI graph were it not for its `Register` method. Use the plain
+`HookedFactory` for ordinary services consumed by controllers or other
+providers.
+
 #### Controllers (HookedController)
 
 Controllers can also use compile-time safe hook registration:
@@ -175,13 +219,14 @@ ligo.Controllers(ligo.HookedController(NewUserController))
 
 **Execution order:**
 1. Module-level `OnStart` hooks
-2. Provider `OnModuleInit` hooks (in registration order, executed in parallel)
-3. Provider `OnApplicationBootstrap` hooks (executed in parallel)
-4. Application runs (HTTP server or signal wait)
-5. Provider `BeforeApplicationShutdown` hooks (reverse order, executed in parallel)
-6. Provider `OnApplicationShutdown` hooks (reverse order, executed in parallel)
-7. Provider `OnModuleDestroy` hooks (reverse order, executed in parallel)
-8. Module-level `OnStop` hooks
+2. `HookedSingleton` providers are eagerly resolved (their `Register` runs)
+3. Provider `OnModuleInit` hooks (in registration order, executed in parallel)
+4. Provider `OnApplicationBootstrap` hooks (executed in parallel)
+5. Application runs (HTTP server or signal wait)
+6. Provider `BeforeApplicationShutdown` hooks (reverse order, executed in parallel)
+7. Provider `OnApplicationShutdown` hooks (reverse order, executed in parallel)
+8. Provider `OnModuleDestroy` hooks (reverse order, executed in parallel)
+9. Module-level `OnStop` hooks
 
 **Performance:** Hooks execute in parallel using goroutines, reducing startup/shutdown time by ~50% for applications with multiple providers.
 

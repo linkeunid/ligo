@@ -566,6 +566,32 @@ ligo.Providers(
 )
 ```
 
+#### HookedSingleton (eager-resolved providers)
+
+`HookedFactory` is lazy: the provider is only instantiated when another
+provider depends on it. That is correct for normal services, but breaks
+down for providers whose **sole purpose** is to attach lifecycle hooks —
+message-broker handler registrations, background workers, schedulers,
+metrics exporters. Nothing else in the DI graph depends on them, so they
+are never resolved, `Register` never runs, and their hooks silently never
+fire.
+
+Use `ligo.HookedSingleton[T]` for these. It behaves identically to
+`HookedFactory` but is resolved at startup regardless of whether another
+provider depends on the type:
+
+```go
+// Nothing else depends on *OrderMessaging — it exists only to bind RPC
+// handlers in OnBootstrap. HookedFactory here would silently no-op;
+// HookedSingleton guarantees Register fires.
+ligo.Providers(
+    ligo.HookedSingleton[*OrderMessaging](NewOrderMessaging),
+)
+```
+
+Use the rule of thumb: if the type would be dead code in the DI graph
+without hooks, use `HookedSingleton`. Otherwise prefer `HookedFactory`.
+
 #### Controllers (HookedController)
 
 Controllers can also use compile-time safe hook registration:

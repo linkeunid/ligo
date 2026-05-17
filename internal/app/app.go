@@ -39,6 +39,7 @@ type Provider interface {
 	Eager() any
 	IsTransient() bool
 	IsExported() bool
+	IsEagerResolve() bool
 	Hooks() *lifecycle.HookRegistry
 }
 
@@ -121,6 +122,10 @@ func BuildModule(parent *di.Container, mod module.Module, hooks *ModuleHooks) {
 		if providerHooks.OnInit != nil || providerHooks.OnBootstrap != nil || providerHooks.OnBeforeShutdown != nil || providerHooks.OnDestroy != nil || providerHooks.OnShutdown != nil || providerHooks.HasRegistry() {
 			hooks.Providers = append(hooks.Providers, providerHooks)
 		}
+
+		if provider.IsEagerResolve() {
+			hooks.EagerTypes = append(hooks.EagerTypes, provider.Type())
+		}
 	}
 
 	if len(mod.OnInit) > 0 {
@@ -165,6 +170,10 @@ type ModuleHooks struct {
 	OnInit    [][]func() error
 	OnDestroy [][]func() error
 	Providers []lifecycle.Hooks // provider/controller-level hooks
+	// EagerTypes collects provider types that must be resolved at startup
+	// regardless of whether anything depends on them — used by HookedSingleton
+	// to ensure Register-only providers actually attach their hooks.
+	EagerTypes []reflect.Type
 }
 
 // ExpandModule materializes a dynamic module and recursively expands its imports,

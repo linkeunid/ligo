@@ -359,11 +359,28 @@ ligo.Providers(
 ligo.Controllers(ligo.HookedController(NewWorkerController))
 ```
 
+**HookedSingleton — for providers with no consumer:**
+
+`HookedFactory` is lazy: if nothing in the DI graph depends on a type, it
+is never constructed and its `Register` method never runs. For providers
+whose only purpose is to attach hooks (broker handler registrations,
+schedulers, background workers), use `HookedSingleton` instead — it is
+resolved eagerly at startup.
+
+```go
+// Nothing else depends on *OrderMessaging — it only exists to bind RPC
+// handlers in OnBootstrap. HookedFactory would silently do nothing.
+ligo.Providers(
+    ligo.HookedSingleton[*OrderMessaging](NewOrderMessaging),
+)
+```
+
 **Benefits of HookedFactory:**
 - **Compile-time safety**: Method typos like `OnModulInit` instead of `OnModuleInit` are caught by the compiler
 - **Explicit registration**: Clear what hooks are registered via the `Register` method
 - **Same flexibility**: Only implement the hooks you need
 - **Works for both Factory and Value providers**: Use `HookedFactory[T]()` or `Value(v, WithHooks())`
+- **Use `HookedSingleton` when no other provider depends on the type** — eager resolution guarantees `Register` runs
 
 ---
 
