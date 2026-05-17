@@ -129,6 +129,21 @@ propagates the joined error to callers.
 error messages. It now returns `errors.Join` of every hook failure so
 calling code can `errors.As` to inspect specific causes.
 
+### Logger options now compose correctly
+
+`logger.WithJSON()`, `logger.WithText()`, and `logger.WithDebug()`
+previously rebuilt the slog handler from scratch each time, so the last
+applied option won — `New(WithJSON(), WithDebug(true))` returned a text
+handler at debug level. Options now mutate a config struct and the
+handler is built once at the end of `New`, so any ordering produces the
+expected combination (JSON at debug, text at debug, etc.).
+
+### Logger: `SetDebug` is concurrency-safe
+
+`SetDebug` no longer rebuilds the handler. It updates a `slog.LevelVar`
+shared with the handler, which is atomic by contract. Concurrent
+`Debug`/`Info`/`SetDebug` calls now race-free.
+
 ### Internal: `app.Provider` interface adds `Fn() any`
 
 The internal `internal/app.Provider` interface now requires `Fn() any`,

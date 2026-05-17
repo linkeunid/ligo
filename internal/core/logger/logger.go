@@ -44,37 +44,46 @@ type Logger interface {
 }
 
 // SlogLogger wraps log/slog for Ligo's Logger interface.
+//
+// handler and logger are written exactly once in New and treated as read-only
+// afterward, so they need no synchronization. SetDebug mutates only the
+// LevelVar, which is atomic by contract.
 type SlogLogger struct {
 	handler slog.Handler
 	logger  *slog.Logger
+	level   *slog.LevelVar
+}
+
+// loggerConfig accumulates option values before the handler is built.
+// Building the handler once at the end of New avoids the prior trap where
+// `WithJSON()` / `WithText()` / `WithDebug()` would overwrite each other's
+// state depending on application order.
+type loggerConfig struct {
+	format Type
+	level  *slog.LevelVar
 }
 
 // LoggerOption configures the logger.
-type LoggerOption func(*SlogLogger)
+type LoggerOption func(*loggerConfig)
 
 // WithJSON enables JSON output format.
 func WithJSON() LoggerOption {
-	return func(l *SlogLogger) {
-		l.handler = slog.NewJSONHandler(os.Stderr, nil)
-		l.logger = slog.New(l.handler)
-	}
+	return func(c *loggerConfig) { c.format = TypeJSON }
 }
 
 // WithText enables text output format (default).
 func WithText() LoggerOption {
-	return func(l *SlogLogger) {
-		l.handler = slog.NewTextHandler(os.Stderr, nil)
-		l.logger = slog.New(l.handler)
-	}
+	return func(c *loggerConfig) { c.format = TypeText }
 }
 
 // WithDebug enables debug logging.
 func WithDebug(enabled bool) LoggerOption {
-	return func(l *SlogLogger) {
-		l.handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})
-		l.logger = slog.New(l.handler)
+	return func(c *loggerConfig) {
+		if enabled {
+			c.level.Set(slog.LevelDebug)
+		} else {
+			c.level.Set(slog.LevelInfo)
+		}
 	}
 }
 
@@ -85,16 +94,27 @@ func WithProduction() LoggerOption {
 
 // New creates a new slog-based logger. Default is text mode for development.
 func New(opts ...LoggerOption) Logger {
-	l := &SlogLogger{
-		handler: slog.NewTextHandler(os.Stderr, nil),
+	cfg := &loggerConfig{
+		format: TypeText,
+		level:  new(slog.LevelVar), // defaults to slog.LevelInfo
 	}
-	l.logger = slog.New(l.handler)
-
 	for _, opt := range opts {
-		opt(l)
+		opt(cfg)
 	}
 
-	return l
+	handlerOpts := &slog.HandlerOptions{Level: cfg.level}
+	var handler slog.Handler
+	if cfg.format == TypeJSON {
+		handler = slog.NewJSONHandler(os.Stderr, handlerOpts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, handlerOpts)
+	}
+
+	return &SlogLogger{
+		handler: handler,
+		logger:  slog.New(handler),
+		level:   cfg.level,
+	}
 }
 
 // Debug logs a debug message.
@@ -123,20 +143,18 @@ func (l *SlogLogger) LogWithContext(ctx Context, msg string, fields ...Field) {
 	l.logger.Info(msg, fieldsToSlogArgs(allFields)...)
 }
 
-// SetDebug enables or disables debug logging.
+// SetDebug enables or disables debug logging. Safe for concurrent use:
+// the underlying slog.LevelVar mutates atomically. No-op on loggers
+// constructed without a LevelVar (e.g. manually composed test fixtures).
 func (l *SlogLogger) SetDebug(enabled bool) {
-	level := slog.LevelInfo
+	if l.level == nil {
+		return
+	}
 	if enabled {
-		level = slog.LevelDebug
-	}
-
-	// Recreate handler preserving text/JSON type
-	if _, ok := l.handler.(*slog.JSONHandler); ok {
-		l.handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+		l.level.Set(slog.LevelDebug)
 	} else {
-		l.handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+		l.level.Set(slog.LevelInfo)
 	}
-	l.logger = slog.New(l.handler)
 }
 
 func fieldsToSlogArgs(fields []Field) []any {

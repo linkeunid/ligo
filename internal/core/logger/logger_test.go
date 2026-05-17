@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -161,6 +162,83 @@ func TestNoop_DoesNotPanic(t *testing.T) {
 	l.Warn("w")
 	l.Error("e")
 	l.LogWithContext(ContextApp, "ctx")
+	l.SetDebug(true)
+	l.SetDebug(false)
+}
+
+// Regression: WithJSON + WithDebug used to clobber each other depending
+// on application order. Both orderings must now yield a JSON handler at
+// debug level.
+func TestOptionsCompose_JSONAndDebug(t *testing.T) {
+	cases := []struct {
+		name string
+		opts []LoggerOption
+	}{
+		{"json then debug", []LoggerOption{WithJSON(), WithDebug(true)}},
+		{"debug then json", []LoggerOption{WithDebug(true), WithJSON()}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			l := New(tc.opts...).(*SlogLogger)
+			if _, ok := l.handler.(*slog.JSONHandler); !ok {
+				t.Errorf("expected JSON handler, got %T", l.handler)
+			}
+			if l.level == nil {
+				t.Fatal("expected non-nil LevelVar")
+			}
+			if got := l.level.Level(); got != slog.LevelDebug {
+				t.Errorf("expected debug level, got %v", got)
+			}
+		})
+	}
+}
+
+func TestOptionsCompose_TextDefaultAtInfo(t *testing.T) {
+	l := New().(*SlogLogger)
+	if _, ok := l.handler.(*slog.TextHandler); !ok {
+		t.Errorf("expected default TextHandler, got %T", l.handler)
+	}
+	if got := l.level.Level(); got != slog.LevelInfo {
+		t.Errorf("expected default info level, got %v", got)
+	}
+}
+
+func TestSetDebug_NoHandlerRecreation(t *testing.T) {
+	l := New().(*SlogLogger)
+	before := l.handler
+	l.SetDebug(true)
+	if l.handler != before {
+		t.Error("SetDebug should not recreate the handler")
+	}
+	if got := l.level.Level(); got != slog.LevelDebug {
+		t.Errorf("expected debug level after SetDebug(true), got %v", got)
+	}
+	l.SetDebug(false)
+	if got := l.level.Level(); got != slog.LevelInfo {
+		t.Errorf("expected info level after SetDebug(false), got %v", got)
+	}
+}
+
+func TestSetDebug_ConcurrentNoRace(t *testing.T) {
+	l := New()
+	var wg sync.WaitGroup
+	for i := range 50 {
+		wg.Go(func() {
+			l.SetDebug(i%2 == 0)
+			l.Debug("msg")
+			l.Info("msg")
+		})
+	}
+	wg.Wait()
+}
+
+func TestSetDebug_NilLevelIsNoOp(t *testing.T) {
+	// Manually-constructed fixture with no LevelVar should not panic.
+	var buf bytes.Buffer
+	l := &SlogLogger{
+		handler: slog.NewTextHandler(&buf, nil),
+		logger:  slog.New(slog.NewTextHandler(&buf, nil)),
+	}
 	l.SetDebug(true)
 	l.SetDebug(false)
 }
