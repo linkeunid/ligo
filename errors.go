@@ -23,10 +23,6 @@ type ErrMissingDependency = di.ErrMissingDependency
 // ErrCircularDependency is returned when a circular dependency is detected in the provider graph.
 type ErrCircularDependency = di.ErrCircularDependency
 
-// ErrDuplicateProvider is returned when a provider for a type is already registered.
-// The first provider is used, and subsequent providers for the same type are ignored.
-type ErrDuplicateProvider = di.ErrDuplicateProvider
-
 // DIError is a general error type for dependency injection operations.
 type DIError = di.DIError
 

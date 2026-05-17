@@ -1,8 +1,31 @@
 package di
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 )
+
+// errEntryEmpty is wrapped in a DIError when a registered provider entry
+// carries neither an eager value nor a factory function.
+var errEntryEmpty = errors.New("ligo: provider entry has neither eager value nor factory")
+
+// formatDIError renders the common
+//
+//	"ligo: <prefix> <type> [(required by <parent>)][: <cause>]"
+//
+// shape shared by DIError and ErrMissingDependency. cause may be nil.
+func formatDIError(prefix, typ, requiredBy string, cause error) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "ligo: %s %s", prefix, typ)
+	if requiredBy != "" {
+		fmt.Fprintf(&b, " (required by %s)", requiredBy)
+	}
+	if cause != nil {
+		fmt.Fprintf(&b, ": %v", cause)
+	}
+	return b.String()
+}
 
 // ErrMissingDependency is returned when a required provider is not found.
 type ErrMissingDependency struct {
@@ -12,7 +35,7 @@ type ErrMissingDependency struct {
 }
 
 func (e *ErrMissingDependency) Error() string {
-	return fmt.Sprintf("ligo: missing dependency %s (required by %s)", e.Type, e.RequiredBy)
+	return formatDIError("missing dependency", e.Type, e.RequiredBy, nil)
 }
 
 func (e *ErrMissingDependency) Unwrap() error { return e.Cause }
@@ -24,15 +47,6 @@ type ErrCircularDependency struct {
 
 func (e *ErrCircularDependency) Error() string {
 	return fmt.Sprintf("ligo: circular dependency detected: %v", e.Chain)
-}
-
-// ErrDuplicateProvider is returned when a provider is registered twice for the same type.
-type ErrDuplicateProvider struct {
-	Type string
-}
-
-func (e *ErrDuplicateProvider) Error() string {
-	return fmt.Sprintf("ligo: duplicate provider for type %s", e.Type)
 }
 
 // ErrAmbiguousDependency is returned when multiple registered types implement the requested interface.
@@ -53,5 +67,7 @@ type DIError struct {
 }
 
 func (e *DIError) Error() string {
-	return fmt.Sprintf("ligo: cannot resolve %s for %s: %v", e.Type, e.RequiredBy, e.Cause)
+	return formatDIError("cannot resolve", e.Type, e.RequiredBy, e.Cause)
 }
+
+func (e *DIError) Unwrap() error { return e.Cause }

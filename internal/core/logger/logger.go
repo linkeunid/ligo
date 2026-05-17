@@ -147,6 +147,19 @@ func fieldsToSlogArgs(fields []Field) []any {
 	return args
 }
 
+// Noop returns a Logger that silently discards every call. Useful as a
+// default for components that accept an optional logger.
+func Noop() Logger { return noopLogger{} }
+
+type noopLogger struct{}
+
+func (noopLogger) Debug(string, ...Field)                   {}
+func (noopLogger) Info(string, ...Field)                    {}
+func (noopLogger) Warn(string, ...Field)                    {}
+func (noopLogger) Error(string, ...Field)                   {}
+func (noopLogger) LogWithContext(Context, string, ...Field) {}
+func (noopLogger) SetDebug(bool)                            {}
+
 // ExtractProviderName extracts a clean name from a provider type or factory function.
 // Deprecated: Use reflectutil.ExtractTypeName instead for better consistency.
 func ExtractProviderName(fn any) string {

@@ -1,4 +1,4 @@
-package container
+package di
 
 import (
 	"errors"
@@ -43,7 +43,7 @@ func (testGreeterB) Greet() string { return "hello-b" }
 
 func TestContainerProvideAndResolve(t *testing.T) {
 	c := New()
-	typ := reflect.TypeOf((*testService)(nil))
+	typ := reflect.TypeFor[*testService]()
 	c.Register(typ, NewEntry(nil, &testService{name: "test"}, nil, false, false, nil))
 
 	entry := c.providers[typ]
@@ -54,7 +54,7 @@ func TestContainerProvideAndResolve(t *testing.T) {
 
 func TestResolveValue(t *testing.T) {
 	c := New()
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "resolved"}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(nil, &testService{name: "resolved"}, nil, false, false, nil))
 
 	svc := MustResolve[*testService](c)
 	if svc == nil {
@@ -91,7 +91,7 @@ func TestResolveFactory(t *testing.T) {
 	factory := func(args []reflect.Value) (any, error) {
 		return &testService{name: "factory"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(factory, nil, nil, false, false, nil))
 
 	svc := MustResolve[*testService](c)
 	if svc == nil {
@@ -110,7 +110,7 @@ func TestResolveTransient(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "transient"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(factory, nil, nil, true, false, nil))
 
 	svc1 := MustResolve[*testService](c)
 	svc2 := MustResolve[*testService](c)
@@ -131,7 +131,7 @@ func TestResolveSingleton(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "singleton"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(factory, nil, nil, false, false, nil))
 
 	svc1 := MustResolve[*testService](c)
 	svc2 := MustResolve[*testService](c)
@@ -148,14 +148,14 @@ func TestAutoInject(t *testing.T) {
 	c := New()
 
 	// Register base service
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "base"}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(nil, &testService{name: "base"}, nil, false, false, nil))
 
 	// Register wrapper with dependency on testService
 	factory := func(args []reflect.Value) (any, error) {
 		return &testWrapper{svc: args[0].Interface().(*testService)}, nil
 	}
-	c.Register(reflect.TypeOf((*testWrapper)(nil)), NewEntry(factory, nil, []reflect.Type{
-		reflect.TypeOf((*testService)(nil)),
+	c.Register(reflect.TypeFor[*testWrapper](), NewEntry(factory, nil, []reflect.Type{
+		reflect.TypeFor[*testService](),
 	}, false, false, nil))
 
 	wrapper := MustResolve[*testWrapper](c)
@@ -174,16 +174,16 @@ func TestCircularDependency(t *testing.T) {
 	factoryA := func(args []reflect.Value) (any, error) {
 		return &testServiceA{b: args[0].Interface().(*testServiceB)}, nil
 	}
-	c.Register(reflect.TypeOf((*testServiceA)(nil)), NewEntry(factoryA, nil, []reflect.Type{
-		reflect.TypeOf((*testServiceB)(nil)),
+	c.Register(reflect.TypeFor[*testServiceA](), NewEntry(factoryA, nil, []reflect.Type{
+		reflect.TypeFor[*testServiceB](),
 	}, false, false, nil))
 
 	// Register B depends on A
 	factoryB := func(args []reflect.Value) (any, error) {
 		return &testServiceB{a: args[0].Interface().(*testServiceA)}, nil
 	}
-	c.Register(reflect.TypeOf((*testServiceB)(nil)), NewEntry(factoryB, nil, []reflect.Type{
-		reflect.TypeOf((*testServiceA)(nil)),
+	c.Register(reflect.TypeFor[*testServiceB](), NewEntry(factoryB, nil, []reflect.Type{
+		reflect.TypeFor[*testServiceA](),
 	}, false, false, nil))
 
 	if _, err := Resolve[*testServiceA](c); err == nil {
@@ -194,10 +194,10 @@ func TestCircularDependency(t *testing.T) {
 func TestDuplicateProvider(t *testing.T) {
 	c := New()
 
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "first"}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(nil, &testService{name: "first"}, nil, false, false, nil))
 
 	// Duplicate provider should be ignored (no panic)
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(nil, &testService{name: "second"}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(nil, &testService{name: "second"}, nil, false, false, nil))
 
 	// Verify the first provider is still used
 	svc := MustResolve[*testService](c)
@@ -214,12 +214,12 @@ func TestConcurrentResolve(t *testing.T) {
 		counter.Add(1)
 		return &testService{name: "concurrent"}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, false, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(factory, nil, nil, false, false, nil))
 
 	// Resolve concurrently from 10 goroutines
 	var wg sync.WaitGroup
 	results := make([]*testService, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -242,7 +242,7 @@ func TestConcurrentResolve(t *testing.T) {
 
 func TestResolveInterfaceTypeDirectKey(t *testing.T) {
 	c := New()
-	doerType := reflect.TypeOf((*testDoer)(nil)).Elem()
+	doerType := reflect.TypeFor[testDoer]()
 	c.Register(doerType, NewEntry(nil, testDoerImpl{}, nil, false, false, nil))
 
 	result := MustResolve[testDoer](c)
@@ -259,11 +259,11 @@ func TestConcurrentTransient(t *testing.T) {
 		n := counter.Add(1)
 		return &testService{name: fmt.Sprintf("instance-%d", n)}, nil
 	}
-	c.Register(reflect.TypeOf((*testService)(nil)), NewEntry(factory, nil, nil, true, false, nil))
+	c.Register(reflect.TypeFor[*testService](), NewEntry(factory, nil, nil, true, false, nil))
 
 	var wg sync.WaitGroup
 	results := make([]*testService, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -274,7 +274,7 @@ func TestConcurrentTransient(t *testing.T) {
 
 	// All results should be different instances (transient)
 	instances := make(map[*testService]bool)
-	for i := 0; i < len(results); i++ {
+	for i := range results {
 		if results[i] == nil {
 			t.Fatal("expected non-nil instance")
 		}
@@ -291,10 +291,10 @@ func TestConcurrentTransient(t *testing.T) {
 
 func TestResolveByInterface_FallbackScan(t *testing.T) {
 	c := New()
-	implType := reflect.TypeOf(testGreeterA{})
+	implType := reflect.TypeFor[testGreeterA]()
 	c.Register(implType, NewEntry(nil, testGreeterA{}, nil, false, false, nil))
 
-	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+	greeterType := reflect.TypeFor[testGreeter]()
 	result, err := c.resolve(greeterType, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -306,10 +306,10 @@ func TestResolveByInterface_FallbackScan(t *testing.T) {
 
 func TestResolveByInterface_AmbiguousReturnsError(t *testing.T) {
 	c := New()
-	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(nil, testGreeterA{}, nil, false, false, nil))
-	c.Register(reflect.TypeOf(testGreeterB{}), NewEntry(nil, testGreeterB{}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[testGreeterA](), NewEntry(nil, testGreeterA{}, nil, false, false, nil))
+	c.Register(reflect.TypeFor[testGreeterB](), NewEntry(nil, testGreeterB{}, nil, false, false, nil))
 
-	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+	greeterType := reflect.TypeFor[testGreeter]()
 	_, err := c.resolve(greeterType, nil)
 	if err == nil {
 		t.Fatal("expected error for ambiguous dependency")
@@ -331,9 +331,9 @@ func TestResolveByInterface_CachedAfterFirst(t *testing.T) {
 		counter.Add(1)
 		return testGreeterA{}, nil
 	}
-	c.Register(reflect.TypeOf(testGreeterA{}), NewEntry(factory, nil, nil, false, false, nil))
+	c.Register(reflect.TypeFor[testGreeterA](), NewEntry(factory, nil, nil, false, false, nil))
 
-	greeterType := reflect.TypeOf((*testGreeter)(nil)).Elem()
+	greeterType := reflect.TypeFor[testGreeter]()
 
 	if _, err := c.resolve(greeterType, nil); err != nil {
 		t.Fatalf("first resolve failed: %v", err)
@@ -355,8 +355,8 @@ type (
 
 func TestBuildPreservesCause(t *testing.T) {
 	c := New()
-	bType := reflect.TypeOf(testSvcB{})
-	aType := reflect.TypeOf(testSvcA{})
+	bType := reflect.TypeFor[testSvcB]()
+	aType := reflect.TypeFor[testSvcA]()
 
 	// Register serviceA with a factory that requires serviceB (not registered)
 	c.Register(aType, NewEntry(
@@ -383,9 +383,29 @@ func TestBuildPreservesCause(t *testing.T) {
 	}
 }
 
+type emptyEntryFixture struct{}
+
+func TestBuild_EmptyEntryReturnsError(t *testing.T) {
+	c := New()
+	typ := reflect.TypeFor[*emptyEntryFixture]()
+	c.Register(typ, NewEntry(nil, nil, nil, false, false, nil))
+
+	_, err := Resolve[*emptyEntryFixture](c)
+	if err == nil {
+		t.Fatal("expected error for entry with neither eager nor factory, got nil")
+	}
+	var dierr *DIError
+	if !errors.As(err, &dierr) {
+		t.Fatalf("expected *DIError in chain, got %T (%v)", err, err)
+	}
+	if !errors.Is(err, errEntryEmpty) {
+		t.Fatalf("expected errors.Is(err, errEntryEmpty), got %v", dierr.Cause)
+	}
+}
+
 func TestResolveByType_ReturnsError(t *testing.T) {
 	c := New()
-	typ := reflect.TypeOf(testSvcA{})
+	typ := reflect.TypeFor[testSvcA]()
 	// Not registered — should return error
 	val, err := ResolveByType(c, typ)
 	if err == nil {
@@ -393,5 +413,80 @@ func TestResolveByType_ReturnsError(t *testing.T) {
 	}
 	if val != nil {
 		t.Fatalf("expected nil value, got %v", val)
+	}
+}
+
+func TestDIError_Unwrap(t *testing.T) {
+	cause := errors.New("synthetic factory failure")
+	err := &DIError{Type: "Foo", Cause: cause}
+
+	if !errors.Is(err, cause) {
+		t.Fatal("expected errors.Is to walk DIError → Cause")
+	}
+	if got := errors.Unwrap(err); !errors.Is(got, cause) {
+		t.Fatalf("Unwrap = %v, want %v", got, cause)
+	}
+}
+
+func TestErrMissingDependency_Format(t *testing.T) {
+	cases := []struct {
+		name string
+		err  *ErrMissingDependency
+		want string
+	}{
+		{
+			name: "top-level resolve (no parent)",
+			err:  &ErrMissingDependency{Type: "*Foo"},
+			want: "ligo: missing dependency *Foo",
+		},
+		{
+			name: "nested resolve (with parent)",
+			err:  &ErrMissingDependency{Type: "*Foo", RequiredBy: "*Bar"},
+			want: "ligo: missing dependency *Foo (required by *Bar)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.err.Error(); got != tc.want {
+				t.Errorf("Error() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuild_FactoryErrorCarriesRequiredBy(t *testing.T) {
+	c := New()
+	type Inner struct{}
+	type Outer struct{ in *Inner }
+
+	factoryErr := errors.New("inner construction failed")
+
+	innerTyp := reflect.TypeFor[*Inner]()
+	c.Register(innerTyp, NewEntry(
+		func(args []reflect.Value) (any, error) { return nil, factoryErr },
+		nil, nil, false, false, nil,
+	))
+
+	outerTyp := reflect.TypeFor[*Outer]()
+	c.Register(outerTyp, NewEntry(
+		func(args []reflect.Value) (any, error) {
+			return &Outer{in: args[0].Interface().(*Inner)}, nil
+		},
+		nil, []reflect.Type{innerTyp}, false, false, nil,
+	))
+
+	_, err := Resolve[*Outer](c)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var dierr *DIError
+	if !errors.As(err, &dierr) {
+		t.Fatalf("expected *DIError in chain, got %T (%v)", err, err)
+	}
+	if dierr.RequiredBy == "" {
+		t.Errorf("DIError.RequiredBy is empty; want parent type name")
+	}
+	if !errors.Is(err, factoryErr) {
+		t.Errorf("expected errors.Is(err, factoryErr); chain is %v", err)
 	}
 }

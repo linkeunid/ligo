@@ -35,8 +35,9 @@ type ProviderEntry struct {
 func New(log ...logger.Logger) *Container {
 	c := &Container{
 		providers: make(map[reflect.Type]ProviderEntry),
+		logger:    logger.Noop(),
 	}
-	if len(log) > 0 {
+	if len(log) > 0 && log[0] != nil {
 		c.logger = log[0]
 	}
 	return c
@@ -48,9 +49,7 @@ func (c *Container) NewChild() *Container {
 	child := &Container{
 		parent:    c,
 		providers: make(map[reflect.Type]ProviderEntry),
-	}
-	if c.logger != nil {
-		child.logger = c.logger
+		logger:    c.logger,
 	}
 	return child
 }
@@ -72,20 +71,16 @@ func (c *Container) Register(typ reflect.Type, entry ProviderEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, exists := c.providers[typ]; exists {
-		if c.logger != nil {
-			c.logger.Warn("Duplicate provider ignored, using existing registration", logger.Field{Key: "type", Value: typ.String()})
-		}
+		c.logger.Warn("Duplicate provider ignored, using existing registration", logger.Field{Key: "type", Value: typ.String()})
 		return
 	}
 	c.providers[typ] = entry
 
-	if c.logger != nil {
-		name := logger.ExtractProviderName(entry.eager)
-		if name == "unknown" && entry.factory != nil {
-			name = logger.ExtractProviderName(entry.factory)
-		}
-		c.logger.Debug("Provider registered", logger.Field{Key: "name", Value: name})
+	name := logger.ExtractProviderName(entry.eager)
+	if name == "unknown" && entry.factory != nil {
+		name = logger.ExtractProviderName(entry.factory)
 	}
+	c.logger.Debug("Provider registered", logger.Field{Key: "name", Value: name})
 }
 
 // Resolve returns an instance of type T from the container.
@@ -167,13 +162,11 @@ func (c *Container) resolve(typ reflect.Type, chain []reflect.Type) (any, error)
 				entry, ok, typ = matchEntry, true, matchType
 				// Cache the interface->concrete mapping
 				c.interfaceCache.Store(requestedTyp, typ)
-				if c.logger != nil {
-					c.logger.LogWithContext(
-						logger.ContextDIContainer, "Interface resolved",
-						logger.Field{Key: "interface", Value: requestedTyp.String()},
-						logger.Field{Key: "concrete", Value: matchType.String()},
-					)
-				}
+				c.logger.LogWithContext(
+					logger.ContextDIContainer, "Interface resolved",
+					logger.Field{Key: "interface", Value: requestedTyp.String()},
+					logger.Field{Key: "concrete", Value: matchType.String()},
+				)
 			default:
 				return nil, &ErrAmbiguousDependency{Interface: typ.String(), Implementors: implementors}
 			}
@@ -246,20 +239,18 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 
 	// Factory with auto-injection
 	if entry.factory != nil {
-		if c.logger != nil {
-			depNames := make([]string, len(entry.argTypes))
-			for i, t := range entry.argTypes {
-				depNames[i] = t.String()
-			}
-			deps := "-"
-			if len(depNames) > 0 {
-				deps = strings.Join(depNames, ", ")
-			}
-			c.logger.LogWithContext(
-				logger.ContextDIContainer, "Constructing "+typ.String(),
-				logger.Field{Key: "deps", Value: deps},
-			)
+		depNames := make([]string, len(entry.argTypes))
+		for i, t := range entry.argTypes {
+			depNames[i] = t.String()
 		}
+		deps := "-"
+		if len(depNames) > 0 {
+			deps = strings.Join(depNames, ", ")
+		}
+		c.logger.LogWithContext(
+			logger.ContextDIContainer, "Constructing "+typ.String(),
+			logger.Field{Key: "deps", Value: deps},
+		)
 		newChain := append(chain, typ)
 		args := make([]reflect.Value, len(entry.argTypes))
 		for i, argType := range entry.argTypes {
@@ -282,9 +273,13 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 
 		instance, err := entry.factory(args)
 		if err != nil {
+			requiredBy := ""
+			if len(chain) > 0 {
+				requiredBy = chain[len(chain)-1].String()
+			}
 			return nil, &DIError{
 				Type:       typ.String(),
-				RequiredBy: "",
+				RequiredBy: requiredBy,
 				Cause:      err,
 			}
 		}
@@ -299,7 +294,7 @@ func (c *Container) build(typ reflect.Type, entry ProviderEntry, chain []reflect
 		return instance, nil
 	}
 
-	return nil, nil
+	return nil, &DIError{Type: typ.String(), Cause: errEntryEmpty}
 }
 
 // NewEntry creates a provider entry for registration.

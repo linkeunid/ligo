@@ -154,6 +154,17 @@ func TestLoggerOutput(t *testing.T) {
 	}
 }
 
+func TestNoop_DoesNotPanic(t *testing.T) {
+	l := Noop()
+	l.Debug("d", Field{Key: "k", Value: "v"})
+	l.Info("i")
+	l.Warn("w")
+	l.Error("e")
+	l.LogWithContext(ContextApp, "ctx")
+	l.SetDebug(true)
+	l.SetDebug(false)
+}
+
 func TestFieldsToSlogArgs(t *testing.T) {
 	fields := []Field{
 		{Key: "string", Value: "value"},

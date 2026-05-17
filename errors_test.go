@@ -30,13 +30,6 @@ func TestErrCircularDependency(t *testing.T) {
 	}
 }
 
-func TestErrDuplicateProvider(t *testing.T) {
-	err := &ErrDuplicateProvider{Type: "*test.Service"}
-	if err.Error() == "" {
-		t.Fatal("expected non-empty error message")
-	}
-}
-
 func TestDIError(t *testing.T) {
 	err := &DIError{
 		Type:       "*test.Service",
