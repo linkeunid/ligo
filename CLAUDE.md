@@ -147,7 +147,7 @@ Node-20 removal.
 
 ## Conventions
 
-- Root files are thin re-exports from `internal/` packages — never add logic to root-level files
+- Root files (`app.go`, `provider.go`, `lifecycle.go`, `router.go`, `options.go`, `module.go`) form the **public API surface**. `app.go` keeps the `App` struct and orchestration entry points (`New`, `Run`, `Resolve[T]`); the rest are mostly re-exports / convenience constructors. New algorithmic logic belongs in `internal/` packages — only the public-API surface lives at the root
 - HTTP abstractions in `internal/http/` are adapter-agnostic — never import Echo directly in `internal/http/`
 - Module middleware resolves via DI and applies per module group
 - Middleware chaining applies in reverse order (last wraps first)
