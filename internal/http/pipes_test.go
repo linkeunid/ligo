@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"io"
 	nethttp "net/http"
 	"strings"
@@ -67,6 +68,7 @@ func (mockContextBase) Header(_ string) string                    { return "" }
 func (mockContextBase) Stream(_ io.Reader) error                  { return nil }
 func (mockContextBase) Request() *nethttp.Request                 { return nil }
 func (mockContextBase) Response() nethttp.ResponseWriter          { return nil }
+func (mockContextBase) RequestContext() context.Context           { return context.Background() }
 func (mockContextBase) SetRequestContainer(_ *di.Container)       {}
 func (mockContextBase) GetRequestContainer() *di.Container        { return nil }
 

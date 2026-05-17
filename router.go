@@ -169,10 +169,25 @@ func AdminGuard(contextKey string) Guard {
 	return http.AdminGuard(contextKey)
 }
 
-// ThrottleGuard creates a rate-limiting guard.
+// ThrottleGuard creates a rate-limiting guard using a process-wide in-memory
+// counter store. New code should prefer NewThrottler so each app has its own
+// state and can clean up on shutdown.
 // Usage: cr.POST("", c.Create).Guard(ligo.ThrottleGuard("ip", 10, time.Minute))
 func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) Guard {
 	return http.ThrottleGuard(identifierKey, maxRequests, window)
+}
+
+// Throttler is an in-memory rate limiter scoped to a single Ligo app.
+type Throttler = http.Throttler
+
+// NewThrottler returns an app-scoped Throttler. Caller is responsible for
+// calling t.Close() on application shutdown to stop the cleanup goroutine.
+//
+//	t := ligo.NewThrottler(10, time.Minute)
+//	defer t.Close()
+//	cr.POST("", c.Create).Guard(t.Guard("ip"))
+func NewThrottler(maxRequests int, window time.Duration) *Throttler {
+	return http.NewThrottler(maxRequests, window)
 }
 
 // Built-in Interceptors

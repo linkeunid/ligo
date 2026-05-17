@@ -3,11 +3,12 @@ package pipes
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+
+	"github.com/linkeunid/ligo/internal/validation"
 )
 
 // ErrBadRequest is the sentinel error wrapped by pipes when client input is invalid.
@@ -43,7 +44,7 @@ func ValidationPipe[T any](_ *T) PipeFunc {
 		if err := ctx.Bind(&input); err != nil {
 			return fmt.Errorf("validation pipe: bind failed: %w", errors.Join(err, ErrBadRequest))
 		}
-		if err := validateExhaustive(validate, &input); err != nil {
+		if err := validation.ValidateExhaustive(validate, &input); err != nil {
 			return fmt.Errorf("validation failed: %w", errors.Join(err, ErrBadRequest))
 		}
 		ctx.Set(ValidatedBodyKey, &input)
@@ -113,108 +114,6 @@ func TrimPipe(param string) PipeFunc {
 	}
 }
 
-// tagRequired is the go-playground/validator tag name for the required constraint.
-// When required fails, the validator skips all subsequent tags on that field (hasValue check),
-// so a second pass is needed to surface min/email/oneof etc. for empty fields.
-const tagRequired = "required"
-
-// validateExhaustive runs two validation passes so fields that fail "required" also
-// report all other tag failures in the same response.
-//
-// Why Two Passes Are Needed:
-// The go-playground/validator library has a behavior where if a field fails the "required"
-// validation, it skips all other validation tags for that field. This means a user would
-// only see "required" error even if the field also fails "email", "min", etc.
-//
-// Two-Pass Strategy:
-// 1. First pass: Run normal validation, collect all errors
-// 2. If any "required" errors found:
-//   - Create a copy of the struct
-//   - Replace empty strings with "x" (passes required check)
-//   - Run validation again on the modified struct
-//   - Merge results from both passes
-//
-// Trade-offs:
-// - Pro: Users see all validation errors at once
-// - Con: Requires copying the entire struct (O(n) where n = struct size)
-// - Alternative: Would require forking validator library or using custom validator
-func validateExhaustive(v *validator.Validate, s any) error {
-	err1 := v.Struct(s)
-	if err1 == nil {
-		return nil
-	}
-	var ve1 validator.ValidationErrors
-	if !errors.As(err1, &ve1) {
-		return err1
-	}
-
-	seen := make(map[string]struct{}, len(ve1))
-	hasRequired := collectValidationErrors(ve1, seen)
-
-	if !hasRequired {
-		return ve1
-	}
-
-	cpy := createStructCopy(s)
-	combined := append(validator.ValidationErrors(nil), ve1...)
-
-	if err2 := v.Struct(cpy.Addr().Interface()); err2 != nil {
-		var ve2 validator.ValidationErrors
-		if !errors.As(err2, &ve2) {
-			return combined
-		}
-		combined = combineValidationResults(ve2, seen, combined)
-	}
-	return combined
-}
-
-// collectValidationErrors collects validation errors and checks for required field errors.
-func collectValidationErrors(ve validator.ValidationErrors, seen map[string]struct{}) bool {
-	hasRequired := false
-	for _, fe := range ve {
-		seen[fe.Field()+"|"+fe.Tag()] = struct{}{}
-		if fe.Tag() == tagRequired {
-			hasRequired = true
-		}
-	}
-	return hasRequired
-}
-
-// createStructCopy creates a modified copy of the struct for second-pass validation.
-// Empty strings are replaced with "x" to pass required validation.
-func createStructCopy(s any) reflect.Value {
-	rv := reflect.ValueOf(s)
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
-	}
-	cpy := reflect.New(rv.Type()).Elem()
-	for i := 0; i < rv.NumField(); i++ {
-		src := rv.Field(i)
-		dst := cpy.Field(i)
-		if !dst.CanSet() {
-			continue
-		}
-		dst.Set(src)
-		if src.Kind() == reflect.String && src.String() == "" {
-			dst.SetString("x")
-		}
-	}
-	return cpy
-}
-
-// combineValidationResults merges second-pass validation errors with first-pass results.
-func combineValidationResults(ve2 validator.ValidationErrors, seen map[string]struct{}, combined validator.ValidationErrors) validator.ValidationErrors {
-	for _, fe := range ve2 {
-		tag, field := fe.Tag(), fe.Field()
-		if tag == tagRequired {
-			continue
-		}
-		key := field + "|" + tag
-		if _, dup := seen[key]; dup {
-			continue
-		}
-		combined = append(combined, fe)
-		seen[key] = struct{}{}
-	}
-	return combined
-}
+// The two-pass validateExhaustive algorithm lives in internal/validation
+// (validation.ValidateExhaustive). This package keeps only the binding/context
+// glue around it.

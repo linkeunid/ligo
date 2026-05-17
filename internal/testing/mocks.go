@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +37,14 @@ func (m *MockContext) Request() *http.Request {
 // Response returns the mock HTTP response writer.
 func (m *MockContext) Response() http.ResponseWriter {
 	return m.resp
+}
+
+// RequestContext returns the embedded request's context, or Background if no request is set.
+func (m *MockContext) RequestContext() context.Context {
+	if m.req != nil {
+		return m.req.Context()
+	}
+	return context.Background()
 }
 
 // Param returns a mock path parameter (always empty string).

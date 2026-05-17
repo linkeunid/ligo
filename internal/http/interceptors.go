@@ -1,27 +1,65 @@
 package http
 
 import (
+	"context"
+	"fmt"
+	"net/http"
 	"time"
-
-	"github.com/linkeunid/ligo/internal/http/interceptors"
 )
 
-// Re-exported interceptor functions
-
-// TimeoutInterceptor creates an interceptor that enforces a timeout on request handling.
+// TimeoutInterceptor creates an interceptor that enforces a timeout on request
+// handling. The timeout context derives from the per-request context returned
+// by ctx.RequestContext(), so client disconnects, parent interceptor timeouts,
+// and graceful-shutdown signals all propagate. The wrapped Context passed into
+// the next handler exposes the timeoutCtx via RequestContext() and Request();
+// handlers should read either when issuing cancellable downstream calls.
+//
+// Caveat: when the timeout fires before next returns, this interceptor returns
+// immediately. The handler goroutine is best-effort: it is not forcibly
+// stopped. If the handler ignores cancellation it keeps running until it
+// returns naturally — captured resources stay reachable until then. Handlers
+// that wrap I/O in cancellable contexts (database drivers, http.Client with
+// the request context) shut down promptly; tight CPU loops do not.
+//
 // Usage: Intercept(TimeoutInterceptor(5 * time.Second))
 func TimeoutInterceptor(timeout time.Duration) Interceptor {
-	i := interceptors.TimeoutInterceptor(timeout)
 	return func(ctx Context, next HandlerFunc) error {
-		// Wrap context to match interceptors.Context interface
-		wrappedCtx := &contextWrapper{ctx: ctx}
-		// Wrap handler to match interceptors.HandlerFunc
-		wrappedNext := func(ic interceptors.Context) error {
-			return next(ic.(*contextWrapper).ctx)
+		parent := ctx.RequestContext()
+		if parent == nil {
+			parent = context.Background()
 		}
-		return i(wrappedCtx, wrappedNext)
+		timeoutCtx, cancel := context.WithTimeout(parent, timeout)
+		defer cancel()
+
+		wrapped := &timeoutContextWrapper{
+			Context: ctx,
+			req:     ctx.Request().WithContext(timeoutCtx),
+			reqCtx:  timeoutCtx,
+		}
+
+		done := make(chan error, 1)
+		go func() { done <- next(wrapped) }()
+
+		select {
+		case err := <-done:
+			return err
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("request timeout after %v", timeout)
+		}
 	}
 }
+
+// timeoutContextWrapper overrides Request and RequestContext to expose the
+// timeout-bound context to the handler while delegating everything else to
+// the underlying Context.
+type timeoutContextWrapper struct {
+	Context
+	req    *http.Request
+	reqCtx context.Context
+}
+
+func (w *timeoutContextWrapper) Request() *http.Request          { return w.req }
+func (w *timeoutContextWrapper) RequestContext() context.Context { return w.reqCtx }
 
 // LoggingInterceptor creates an interceptor that logs request details.
 // The logFunc callback receives the start time, context, and any error.
@@ -35,13 +73,4 @@ func LoggingInterceptor(logFunc func(start time.Time, ctx Context, err error)) I
 		}
 		return err
 	}
-}
-
-// contextWrapper wraps http.Context to implement interceptors.Context
-type contextWrapper struct {
-	ctx Context
-}
-
-func (w *contextWrapper) Request() any {
-	return w.ctx.Request()
 }

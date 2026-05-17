@@ -46,9 +46,20 @@ func (e *ChainableError) WithRequiredBy(requiredBy string) *ChainableError {
 	return e
 }
 
+// maxFormatChainDepth bounds FormatChain recursion. Cyclic error chains
+// (legal under errors.Unwrap — A.Unwrap()=B, B.Unwrap()=A) would otherwise
+// stack-overflow the formatter; pathological deep chains would DoS it.
+const maxFormatChainDepth = 32
+
 // FormatChain formats a dependency chain for error messages.
 // This is useful for displaying the full chain of missing dependencies.
+// Depth is capped at maxFormatChainDepth to prevent stack overflow on
+// cyclic chains; subsequent links are replaced with "<truncated>".
 func FormatChain(dep, requiredBy string, cause error, indent string) string {
+	return formatChainDepth(dep, requiredBy, cause, indent, 0)
+}
+
+func formatChainDepth(dep, requiredBy string, cause error, indent string, depth int) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s%s", indent, dep)
 	if requiredBy != "" {
@@ -56,10 +67,15 @@ func FormatChain(dep, requiredBy string, cause error, indent string) string {
 	}
 	b.WriteString("\n")
 
+	if depth >= maxFormatChainDepth {
+		fmt.Fprintf(&b, "%s  <truncated>", indent)
+		return b.String()
+	}
+
 	// Continue unwrapping if there's a chainable cause
 	var chainable *ChainableError
 	if stderrors.As(cause, &chainable) {
-		b.WriteString(FormatChain(chainable.Type, chainable.RequiredBy, chainable.Cause, indent+"  "))
+		b.WriteString(formatChainDepth(chainable.Type, chainable.RequiredBy, chainable.Cause, indent+"  ", depth+1))
 	} else if cause != nil {
 		fmt.Fprintf(&b, "%s  %s", indent, cause.Error())
 	}

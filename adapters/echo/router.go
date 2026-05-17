@@ -197,6 +197,10 @@ func (ca *contextAdapter) Response() http.ResponseWriter {
 	return ca.c.Response()
 }
 
+func (ca *contextAdapter) RequestContext() context.Context {
+	return ca.c.Request().Context()
+}
+
 func (ca *contextAdapter) Param(key string) string {
 	return ca.c.Param(key)
 }

@@ -3,7 +3,6 @@ package guards
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -56,116 +55,161 @@ func RolesGuard(contextKey string, requiredRoles ...string) GuardFunc {
 	}
 }
 
-// ThrottleGuard creates a rate-limiting guard using a simple in-memory counter.
-// Usage: Guard(ThrottleGuard("ip", 10, time.Minute))
-func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) GuardFunc {
-	// Initialize cleanup goroutine on first use
-	startThrottleCleanup()
+// Throttler is an in-memory rate limiter. Each instance owns its own counter
+// store and cleanup goroutine, so two app instances in the same process no
+// longer share state (the prior package-level globals had this defect) and
+// tests can scope a fresh Throttler per test. Call Close to stop the cleanup
+// goroutine on shutdown.
+type Throttler struct {
+	maxRequests int
+	window      time.Duration
 
+	mu    sync.Mutex
+	store map[string][]time.Time
+
+	stop chan struct{}
+	once sync.Once
+}
+
+// NewThrottler returns a Throttler with its own cleanup goroutine. Caller
+// must invoke Close on application shutdown to stop the goroutine.
+func NewThrottler(maxRequests int, window time.Duration) *Throttler {
+	t := &Throttler{
+		maxRequests: maxRequests,
+		window:      window,
+		store:       make(map[string][]time.Time),
+		stop:        make(chan struct{}),
+	}
+	go t.cleanupLoop()
+	return t
+}
+
+// Close stops the cleanup goroutine. Idempotent.
+func (t *Throttler) Close() {
+	t.once.Do(func() { close(t.stop) })
+}
+
+// Guard returns a GuardFunc using identifierKey to look up the client
+// identifier in the request context. Identifiers without a stored value fall
+// back to the literal string "default".
+func (t *Throttler) Guard(identifierKey string) GuardFunc {
 	return func(ctx Context) (bool, error) {
 		identifier := ctx.Get(identifierKey)
 		if identifier == nil {
 			identifier = "default"
 		}
 		key := fmt.Sprintf("throttle:%v", identifier)
-
-		throttleMu.Lock()
-		defer throttleMu.Unlock()
-
 		now := time.Now()
-		if _, ok := throttleStore[key]; !ok {
-			throttleStore[key] = &throttleEntry{}
+
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
+		counts := filterOldCounts(t.store[key], now.Add(-t.window))
+		if len(counts) >= t.maxRequests {
+			t.store[key] = counts
+			return false, fmt.Errorf("rate limit exceeded: %d requests per %v", t.maxRequests, t.window)
 		}
-
-		entry := throttleStore[key]
-		entry.mu.Lock()
-		defer entry.mu.Unlock()
-
-		entry.counts = filterOldCounts(entry.counts, now.Add(-window))
-
-		if len(entry.counts) >= maxRequests {
-			return false, fmt.Errorf("rate limit exceeded: %d requests per %v", maxRequests, window)
-		}
-
-		entry.counts = append(entry.counts, now)
+		t.store[key] = append(counts, now)
 		return true, nil
 	}
 }
 
-var (
-	throttleStore  = make(map[string]*throttleEntry)
-	throttleMu     sync.Mutex
-	cleanupStarted atomic.Bool
-)
+func (t *Throttler) cleanupLoop() {
+	ticker := time.NewTicker(ThrottleCleanupInterval)
+	defer ticker.Stop()
 
-type throttleEntry struct {
-	mu     sync.Mutex
-	counts []time.Time
+	for {
+		select {
+		case <-t.stop:
+			return
+		case <-ticker.C:
+			t.cleanup()
+		}
+	}
+}
+
+func (t *Throttler) cleanup() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	now := time.Now()
+	for key, counts := range t.store {
+		counts = filterOldCounts(counts, now.Add(-time.Hour))
+		if len(counts) == 0 {
+			delete(t.store, key)
+		} else {
+			t.store[key] = counts
+		}
+	}
+	if len(t.store) > MaxThrottleEntries {
+		t.evictArbitraryEntries()
+	}
+}
+
+// evictArbitraryEntries removes entries beyond MaxThrottleEntries to bound
+// memory. Go map iteration order is randomized, so the entries dropped are
+// arbitrary — not strictly the oldest. True LRU would require per-entry
+// "last seen" tracking; for rate-limit memory bounds the current approach
+// is sufficient. Callers must hold t.mu.
+func (t *Throttler) evictArbitraryEntries() {
+	buffer := int(float64(MaxThrottleEntries) * EvictionBufferPercentage)
+	toRemove := (len(t.store) - MaxThrottleEntries) + buffer
+	count := 0
+	for key := range t.store {
+		if count >= toRemove {
+			break
+		}
+		delete(t.store, key)
+		count++
+	}
 }
 
 func filterOldCounts(counts []time.Time, cutoff time.Time) []time.Time {
 	i := 0
-	for _, t := range counts {
-		if t.After(cutoff) {
-			counts[i] = t
+	for _, ts := range counts {
+		if ts.After(cutoff) {
+			counts[i] = ts
 			i++
 		}
 	}
 	return counts[:i]
 }
 
-// startThrottleCleanup runs periodic cleanup of old throttle entries.
-// Called automatically on first use of ThrottleGuard.
-func startThrottleCleanup() {
-	if cleanupStarted.Swap(true) {
-		return
-	}
+// defaultThrottler is the process-wide Throttler that backs the legacy
+// ThrottleGuard function. Lazily initialized on first use and never closed
+// for backwards compatibility — callers that want explicit lifecycle should
+// use NewThrottler directly.
+var defaultThrottler = sync.OnceValue(func() *Throttler {
+	// maxRequests/window are set per-Guard, not on the Throttler — the legacy
+	// API encodes them per call. Use sentinel values; the Throttler ignores
+	// them and the wrapper below provides them per call.
+	return NewThrottler(0, 0)
+})
 
-	go func() {
-		ticker := time.NewTicker(ThrottleCleanupInterval)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			throttleMu.Lock()
-			now := time.Now()
-			for key, entry := range throttleStore {
-				entry.mu.Lock()
-				entry.counts = filterOldCounts(entry.counts, now.Add(-time.Hour))
-				if len(entry.counts) == 0 {
-					delete(throttleStore, key)
-				}
-				entry.mu.Unlock()
-			}
-			// Enforce maximum entries to prevent unbounded memory growth
-			if len(throttleStore) > MaxThrottleEntries {
-				evictOldestEntries()
-			}
-			throttleMu.Unlock()
-		}
-	}()
-}
-
-// evictOldestEntries removes oldest entries to maintain MaxThrottleEntries limit.
+// ThrottleGuard creates a rate-limiting guard using a process-wide
+// in-memory counter store. New code should prefer NewThrottler so each app
+// has its own state and can clean up on shutdown.
 //
-// Eviction Strategy:
-// - Uses an eviction buffer (10% of max) to avoid frequent eviction cycles
-// - Removes extra entries beyond the limit to reduce cleanup frequency
-// - Simple map iteration removal (not true LRU, but sufficient for rate limiting)
-//
-// Trade-offs:
-// - True LRU would require tracking last access time per entry (more memory)
-// - Random eviction would be simpler but less predictable
-// - Current approach balances memory overhead with eviction frequency
-func evictOldestEntries() {
-	buffer := int(float64(MaxThrottleEntries) * EvictionBufferPercentage)
-	toRemove := (len(throttleStore) - MaxThrottleEntries) + buffer
-	count := 0
-	for key := range throttleStore {
-		if count >= toRemove {
-			break
+// Usage: Guard(ThrottleGuard("ip", 10, time.Minute))
+func ThrottleGuard(identifierKey string, maxRequests int, window time.Duration) GuardFunc {
+	t := defaultThrottler()
+	return func(ctx Context) (bool, error) {
+		identifier := ctx.Get(identifierKey)
+		if identifier == nil {
+			identifier = "default"
 		}
-		delete(throttleStore, key)
-		count++
+		key := fmt.Sprintf("throttle:%v", identifier)
+		now := time.Now()
+
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
+		counts := filterOldCounts(t.store[key], now.Add(-window))
+		if len(counts) >= maxRequests {
+			t.store[key] = counts
+			return false, fmt.Errorf("rate limit exceeded: %d requests per %v", maxRequests, window)
+		}
+		t.store[key] = append(counts, now)
+		return true, nil
 	}
 }
 

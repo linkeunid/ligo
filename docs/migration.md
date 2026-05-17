@@ -129,6 +129,72 @@ propagates the joined error to callers.
 error messages. It now returns `errors.Join` of every hook failure so
 calling code can `errors.As` to inspect specific causes.
 
+### Context interface adds `RequestContext()`
+
+Every `Context` implementation must now expose
+`RequestContext() context.Context`. The echo adapter and `MockContext`
+both implement it; custom Context implementations need to add it.
+Handlers and interceptors should call `ctx.RequestContext()` (not
+`ctx.Request().Context()`) when issuing cancellable downstream calls so
+they observe timeouts and graceful-shutdown cancellation.
+
+### `TimeoutInterceptor` is correctness-clean
+
+`TimeoutInterceptor`:
+
+- Derives the timeout from the per-request context, so client
+  disconnect, parent timeouts, and graceful shutdown propagate. Previously
+  it derived from `context.Background()` and ran independent of any other
+  cancellation signal.
+- Hands the handler a `Context` whose `RequestContext()` returns the
+  timeout-bound context, so cancellable downstream calls exit promptly
+  when the timeout fires.
+- Documents that the handler goroutine is best-effort and not forcibly
+  stopped — handlers that ignore cancellation keep running. The prior
+  implementation also had this leak but wrote it onto the same
+  ResponseWriter as the interceptor, which is undefined behavior. The
+  new wrapper does not write a response when the timeout fires.
+
+The `internal/http/interceptors` leaf package is removed (all logic moved
+into `internal/http/interceptors.go`). External code never imported it
+(internal/ scoped).
+
+### Rate limiting: `NewThrottler` for app-scoped state
+
+Use `NewThrottler(maxRequests, window)` for an isolated rate-limiter you
+can `Close()` on shutdown. Each instance owns its own store and cleanup
+goroutine, so two apps in the same process no longer share state and
+tests can scope fresh state per case:
+
+```go
+t := ligo.NewThrottler(10, time.Minute)
+defer t.Close()
+cr.POST("", c.Create).Guard(t.Guard("ip"))
+```
+
+`ligo.ThrottleGuard("ip", 10, time.Minute)` still works using a
+process-wide singleton. The fixes for `evictOldestEntries` (renamed
+`evictArbitraryEntries`, godoc clarified) and the coarse mutex (per-entry
+lock dropped) apply to both paths.
+
+### Validation: contradictory format errors suppressed
+
+The two-pass exhaustive validator stops surfacing "must be valid email"
+or "must be one of …" for fields that already failed `required`. The
+substitution-with-`"x"` shim used to satisfy `required` but fail format
+tags itself, so users saw `required` AND `email` for the same empty
+input. Non-format tags (`min`, `max`, `gte`, `lte`, etc.) still surface
+in pass 2.
+
+`validation.ValidateExhaustive` (exported) is now the single
+implementation; `internal/http/pipes` imports it.
+
+### `FormatChain` caps recursion at 32 levels
+
+Cyclic error chains (legal under `errors.Unwrap`) and pathologically
+deep ones no longer stack-overflow the formatter — chain depth is capped
+and the output ends with `<truncated>` when the limit is hit.
+
 ### Module middleware no longer prefixes routes
 
 Previously, attaching middleware to a module silently re-namespaced every

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -22,6 +23,11 @@ type Middleware func(HandlerFunc) HandlerFunc
 type Context interface {
 	Request() *http.Request
 	Response() http.ResponseWriter
+	// RequestContext returns the per-request cancellation context. Interceptors
+	// derive timeouts from it (so client disconnect and graceful shutdown
+	// propagate), and handlers should read it when calling cancellable
+	// downstream operations (database queries, RPCs).
+	RequestContext() context.Context
 	Param(key string) string
 	// Query returns a single query-string value or "" when absent.
 	Query(key string) string
