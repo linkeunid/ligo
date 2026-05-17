@@ -87,7 +87,7 @@ func (r *HookRegistry) ToHooks() Hooks {
 	}
 }
 
-// GetHooks returns the collected hooks as a slice (for module-level use).
+// GetInitHooks returns the collected OnInit hooks for module-level use.
 func (r *ModuleHookRegistry) GetInitHooks() []func() error {
 	return r.onInit
 }

@@ -165,18 +165,23 @@ func TestAppLifecycle(t *testing.T) {
 		// Wait for hooks to execute
 		time.Sleep(300 * time.Millisecond)
 
+		// Snapshot under the mutex — addOrder writes from goroutines.
+		mu.Lock()
+		snapshot := append([]string(nil), order...)
+		mu.Unlock()
+
 		// Verify init hooks were called in order
-		if len(order) < 2 {
-			t.Fatalf("Expected at least 2 hook calls, got %d", len(order))
+		if len(snapshot) < 2 {
+			t.Fatalf("Expected at least 2 hook calls, got %d", len(snapshot))
 		}
 
 		// Actual order: app-start is called BEFORE module-init
 		// See app.Run(): OnStart hooks are called before OnModuleInit hooks
-		if order[0] != "app-start" {
-			t.Errorf("Expected first hook to be 'app-start', got '%s'", order[0])
+		if snapshot[0] != "app-start" {
+			t.Errorf("Expected first hook to be 'app-start', got '%s'", snapshot[0])
 		}
-		if order[1] != "module-init" {
-			t.Errorf("Expected second hook to be 'module-init', got '%s'", order[1])
+		if snapshot[1] != "module-init" {
+			t.Errorf("Expected second hook to be 'module-init', got '%s'", snapshot[1])
 		}
 
 		// Don't wait for shutdown in test

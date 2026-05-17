@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	echo "github.com/labstack/echo/v5"
 
@@ -26,8 +27,10 @@ type Adapter struct {
 	e          *echo.Echo
 	middleware []httpifc.Middleware
 	logger     logger.Logger
-	server     *http.Server
-	container  *di.Container
+	// server is written by Serve (in one goroutine) and read by Shutdown
+	// (in another), so the pointer must be published atomically.
+	server    atomic.Pointer[http.Server]
+	container *di.Container
 }
 
 // NewAdapter creates a new Echo v5 adapter.
@@ -85,8 +88,9 @@ func (a *Adapter) wrapHandler(handler httpifc.HandlerFunc) echo.HandlerFunc {
 
 // Serve starts the HTTP server.
 func (a *Adapter) Serve(addr string) error {
-	a.server = &http.Server{Addr: addr, Handler: a.e}
-	err := a.server.ListenAndServe()
+	srv := &http.Server{Addr: addr, Handler: a.e}
+	a.server.Store(srv)
+	err := srv.ListenAndServe()
 	if err != nil {
 		// Check for "address already in use" errors
 		var opErr *net.OpError
@@ -99,8 +103,8 @@ func (a *Adapter) Serve(addr string) error {
 
 // Shutdown gracefully shuts down the server.
 func (a *Adapter) Shutdown(ctx context.Context) error {
-	if a.server != nil {
-		return a.server.Shutdown(ctx)
+	if srv := a.server.Load(); srv != nil {
+		return srv.Shutdown(ctx)
 	}
 	return nil
 }

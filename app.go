@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/linkeunid/ligo/internal/app"
 	"github.com/linkeunid/ligo/internal/core/lifecycle"
@@ -20,11 +21,13 @@ import (
 // App represents a Ligo application with dependency injection, module management,
 // and HTTP server capabilities.
 type App struct {
-	mu          sync.Mutex
-	started     bool
-	modules     []module.Module
-	providers   []Provider
-	container   *di.Container
+	mu        sync.Mutex
+	started   bool
+	modules   []module.Module
+	providers []Provider
+	// container is written by Run (which may run in a goroutine while a
+	// test reads from Container()), so it must be published atomically.
+	container   atomic.Pointer[di.Container]
 	moduleHooks *app.ModuleHooks
 	opts        options
 }
@@ -115,7 +118,7 @@ func (a *App) Run() error {
 	a.opts.logger.Info("Starting ligo application", logger.Field{Key: "context", Value: logger.ContextApp})
 
 	root := a.buildContainer()
-	a.container = root
+	a.container.Store(root)
 
 	expandedModules := app.ExpandModules(a.modules)
 	a.initializeModules(root, expandedModules)
@@ -367,8 +370,9 @@ func (a *App) shutdown() error {
 }
 
 func (a *App) Container() *di.Container {
-	if a.container == nil {
+	c := a.container.Load()
+	if c == nil {
 		panic("ligo: cannot access container before Run()")
 	}
-	return a.container
+	return c
 }

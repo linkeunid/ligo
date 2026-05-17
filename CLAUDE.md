@@ -37,11 +37,13 @@ Every ligo* repo ships `.golangci.yml` enabling `errcheck`, `govet`,
 `nolintlint`. `govet.enable` adds gopls's `infertypeargs`, `shadow`,
 `nilness`, and `fieldalignment`.
 
-`infertypeargs` matters: it flags `Pkg.Generic[T](...)` calls where `T`
-is inferable from the arguments. Required reading:
+`infertypeargs` flags `Pkg.Generic[T](...)` calls where `T` is
+inferable from the arguments. Required reading:
 https://pkg.go.dev/golang.org/x/tools/gopls/internal/analysis/infertypeargs.
-The IDE (gopls) surfaces these as warnings; CI catches them via
-`golangci-lint`. Strip the explicit type args — they add visual noise
+Source lives inside the `gopls/internal/` package tree, which means it
+cannot be wired into `golangci-lint v2` (no public import). It runs in
+your editor via `gopls` and we leave it as an IDE-only check. Strip the
+explicit type args when the warning lights up — they add visual noise
 and drift out of sync with the underlying signature.
 
 Install the toolchain once:

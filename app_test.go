@@ -57,11 +57,12 @@ func TestAppRunResolvesModules(t *testing.T) {
 	// Wait for app to start and build container
 	time.Sleep(100 * time.Millisecond)
 
-	if app.container == nil {
+	container := app.Container()
+	if container == nil {
 		t.Fatal("expected container to be built after Run()")
 	}
 
-	svc := di.Resolve[*testSvc](app.container)
+	svc := di.Resolve[*testSvc](container)
 	if svc.name != "svc" {
 		t.Fatalf("expected 'svc', got %s", svc.name)
 	}
