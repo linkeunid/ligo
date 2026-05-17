@@ -107,11 +107,15 @@ func TestOnModuleInit(t *testing.T) {
 	m := &Module{}
 	opt(m)
 
-	if len(m.OnInit) != 1 {
-		t.Errorf("OnModuleInit() added %d hooks, want 1", len(m.OnInit))
+	if m.Hooks == nil {
+		t.Fatal("OnModuleInit() did not allocate Hooks registry")
+	}
+	initHooks := m.Hooks.GetInitHooks()
+	if len(initHooks) != 1 {
+		t.Errorf("OnModuleInit() added %d hooks, want 1", len(initHooks))
 	}
 
-	err := m.OnInit[0]()
+	err := initHooks[0]()
 	if err != nil {
 		t.Errorf("OnModuleInit hook returned error: %v", err)
 	}
@@ -131,11 +135,15 @@ func TestOnModuleDestroy(t *testing.T) {
 	m := &Module{}
 	opt(m)
 
-	if len(m.OnDestroy) != 1 {
-		t.Errorf("OnModuleDestroy() added %d hooks, want 1", len(m.OnDestroy))
+	if m.Hooks == nil {
+		t.Fatal("OnModuleDestroy() did not allocate Hooks registry")
+	}
+	destroyHooks := m.Hooks.GetDestroyHooks()
+	if len(destroyHooks) != 1 {
+		t.Errorf("OnModuleDestroy() added %d hooks, want 1", len(destroyHooks))
 	}
 
-	err := m.OnDestroy[0]()
+	err := destroyHooks[0]()
 	if err != nil {
 		t.Errorf("OnModuleDestroy hook returned error: %v", err)
 	}
@@ -208,11 +216,14 @@ func TestModuleOptionsCombined(t *testing.T) {
 	if len(m.Imports) != 1 {
 		t.Errorf("Module Imports length = %d, want 1", len(m.Imports))
 	}
-	if len(m.OnInit) != 1 {
-		t.Errorf("Module OnInit length = %d, want 1", len(m.OnInit))
+	if m.Hooks == nil {
+		t.Fatal("expected Hooks registry populated")
 	}
-	if len(m.OnDestroy) != 1 {
-		t.Errorf("Module OnDestroy length = %d, want 1", len(m.OnDestroy))
+	if got := len(m.Hooks.GetInitHooks()); got != 1 {
+		t.Errorf("Module OnInit length = %d, want 1", got)
+	}
+	if got := len(m.Hooks.GetDestroyHooks()); got != 1 {
+		t.Errorf("Module OnDestroy length = %d, want 1", got)
 	}
 }
 

@@ -126,14 +126,10 @@ func BuildModule(parent *di.Container, mod module.Module, hooks *ModuleHooks) {
 		}
 	}
 
-	if len(mod.OnInit) > 0 {
-		hooks.OnInit = append(hooks.OnInit, mod.OnInit)
-	}
-	if len(mod.OnDestroy) > 0 {
-		hooks.OnDestroy = append(hooks.OnDestroy, mod.OnDestroy)
-	}
-
-	// Handle explicit module hooks registry
+	// All module hooks (whether registered via OnModuleInit/OnModuleDestroy
+	// options or via an explicit ligo.Hooks(registry) option) now live on
+	// mod.Hooks. The previous parallel mod.OnInit/mod.OnDestroy slices were
+	// collapsed into the registry.
 	if mod.Hooks != nil {
 		if initHooks := mod.Hooks.GetInitHooks(); len(initHooks) > 0 {
 			hooks.OnInit = append(hooks.OnInit, initHooks)
@@ -189,8 +185,20 @@ func ExpandModule(mod module.Module, visited map[string]bool) (module.Module, bo
 		mod.Controllers = append(mod.Controllers, dynamic.Controllers...)
 		mod.Imports = append(mod.Imports, dynamic.Imports...)
 		mod.Middlewares = append(mod.Middlewares, dynamic.Middlewares...)
-		mod.OnInit = append(mod.OnInit, dynamic.OnInit...)
-		mod.OnDestroy = append(mod.OnDestroy, dynamic.OnDestroy...)
+		// Merge dynamic module hooks into the host module's registry.
+		if dynamic.Hooks != nil {
+			host := mod.Hooks
+			if host == nil {
+				host = lifecycle.NewModuleHookRegistry()
+				mod.Hooks = host
+			}
+			for _, fn := range dynamic.Hooks.GetInitHooks() {
+				host.OnInit(fn)
+			}
+			for _, fn := range dynamic.Hooks.GetDestroyHooks() {
+				host.OnDestroy(fn)
+			}
+		}
 		mod.Dynamic = nil
 	}
 

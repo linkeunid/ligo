@@ -611,9 +611,16 @@ func TestExplicitHooks(t *testing.T) {
 		hooks := &ModuleHooks{}
 		BuildModule(c, m, hooks)
 
-		// Should have 2 init hooks (one from OnModuleInit, one from registry)
-		if len(hooks.OnInit) != 2 {
-			t.Errorf("BuildModule() OnInit length = %d, want 2", len(hooks.OnInit))
+		// Should have 2 init hooks total (one from OnModuleInit, one from
+		// registry). Module hooks now collapse onto a single registry per
+		// module, so they land in one inner slice rather than two outer
+		// slices.
+		total := 0
+		for _, inner := range hooks.OnInit {
+			total += len(inner)
+		}
+		if total != 2 {
+			t.Errorf("BuildModule() OnInit hook count = %d, want 2", total)
 		}
 	})
 }

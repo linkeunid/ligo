@@ -19,6 +19,34 @@ This guide helps you migrate your Ligo applications between versions.
 Two behavior changes to plan for, plus two additive APIs. All adjustments
 are mechanical.
 
+### Module hook channels collapsed onto `Hooks` registry
+
+`Module` previously exposed two parallel hook registration channels:
+
+- `Module.OnInit []func() error` / `Module.OnDestroy []func() error` (added by `ligo.OnModuleInit` / `ligo.OnModuleDestroy`)
+- `Module.Hooks *lifecycle.ModuleHookRegistry` (added by `ligo.Hooks(...)`)
+
+Coordinators had to read both. The `OnInit` / `OnDestroy` slice fields
+are removed; `ligo.OnModuleInit` / `ligo.OnModuleDestroy` now append to
+`m.Hooks` (allocating the registry on first use). `ligo.Hooks(...)`
+merges any previously-registered functional hooks into the supplied
+registry rather than overwriting them.
+
+If you constructed `module.Module` literally:
+
+```go
+// before
+m := module.Module{OnInit: []func() error{fn}}
+
+// after
+reg := lifecycle.NewModuleHookRegistry()
+reg.OnInit(fn)
+m := module.Module{Hooks: reg}
+```
+
+Code using `ligo.Module(...)` with `ligo.OnModuleInit(...)` /
+`ligo.OnModuleDestroy(...)` keeps working unchanged.
+
 ### `Hooks.Refresh()` now mutates in place
 
 `Hooks.Refresh()` used to have a value receiver and return the mutated
