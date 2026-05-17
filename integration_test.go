@@ -2,6 +2,7 @@ package ligo_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -817,7 +818,7 @@ func TestErrorHandling(t *testing.T) {
 		// The app should handle the error gracefully
 		select {
 		case err := <-runErr:
-			if err != nil && err != http.ErrServerClosed {
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
 				// Expected: some error from failed init
 				t.Logf("Got expected error from failed init: %v", err)
 			}

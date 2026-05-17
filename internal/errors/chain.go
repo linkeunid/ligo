@@ -1,6 +1,7 @@
 package errors
 
 import (
+	stderrors "errors"
 	"fmt"
 	"strings"
 )
@@ -56,7 +57,8 @@ func FormatChain(dep, requiredBy string, cause error, indent string) string {
 	b.WriteString("\n")
 
 	// Continue unwrapping if there's a chainable cause
-	if chainable, ok := cause.(*ChainableError); ok {
+	var chainable *ChainableError
+	if stderrors.As(cause, &chainable) {
 		b.WriteString(FormatChain(chainable.Type, chainable.RequiredBy, chainable.Cause, indent+"  "))
 	} else if cause != nil {
 		fmt.Fprintf(&b, "%s  %s", indent, cause.Error())

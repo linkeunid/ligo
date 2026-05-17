@@ -91,7 +91,7 @@ func (a *Adapter) Serve(addr string) error {
 		// Check for "address already in use" errors
 		var opErr *net.OpError
 		if errors.As(err, &opErr) && (opErr.Op == "listen" || strings.Contains(opErr.Error(), "address already in use") || strings.Contains(opErr.Error(), "EADDRINUSE")) {
-			return fmt.Errorf("%w: %v", app.ErrAddrInUse, err)
+			return fmt.Errorf("%w: %w", app.ErrAddrInUse, err)
 		}
 	}
 	return err

@@ -10,7 +10,7 @@ import (
 func NewTestApp(modules ...ligo.Module) *ligo.App {
 	app := ligo.New()
 	app.Register(modules...)
-	app.Run()
+	_ = app.Run() // test helper — caller doesn't care about Run's error
 	return app
 }
 
@@ -25,6 +25,6 @@ func NewTestAppWithOverrides(modules []ligo.Module, overrides ...ligo.Provider) 
 	app := ligo.New()
 	app.Provide(overrides...)
 	app.Register(modules...)
-	app.Run()
+	_ = app.Run() // test helper — caller doesn't care about Run's error
 	return app
 }

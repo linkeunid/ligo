@@ -53,7 +53,37 @@ go install mvdan.cc/gofumpt@latest
 go install golang.org/x/vuln/cmd/govulncheck@latest
 go install golang.org/x/tools/gopls@latest
 go install github.com/daixiang0/gci@latest
+go install github.com/4meepo/tagalign/cmd/tagalign@latest
 ```
+
+### Struct tag alignment (tagalign)
+
+`tagalign` (run as part of `golangci-lint`) requires struct tags to line
+up across fields. When a struct has more than one field with multiple
+tags, the tag columns must align with two-space separators:
+
+```go
+// Good — columns line up
+type CreateUserInput struct {
+    Name  string `json:"name"  validate:"required,min=2,max=100"`
+    Email string `json:"email" validate:"required,email"`
+}
+
+// Bad — single space, columns drift
+type CreateUserInput struct {
+    Name  string `json:"name" validate:"required,min=2,max=100"`
+    Email string `json:"email" validate:"required,email"`
+}
+```
+
+Auto-fix:
+
+```bash
+tagalign -fix -sort $(find . -name "*.go" -not -path "./vendor/*")
+```
+
+`-sort` also enforces a deterministic tag ordering (`json` before
+`validate`, etc.). Single-field structs are exempt.
 
 ### Import order (gci)
 

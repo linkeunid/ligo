@@ -10,7 +10,6 @@ import (
 type AppLifecycle struct {
 	mu      sync.Mutex
 	started bool
-	hooks   [][]LifecycleHook
 	onStart []func(ctx context.Context) error
 	onStop  []func(ctx context.Context) error
 	server  *http.Server

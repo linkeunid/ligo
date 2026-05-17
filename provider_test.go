@@ -5,9 +5,7 @@ import (
 	"testing"
 )
 
-type testService struct {
-	name string
-}
+type testService struct{}
 
 type (
 	testDoer     interface{ Do() string }

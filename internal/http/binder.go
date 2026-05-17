@@ -104,7 +104,7 @@ func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor, modName stri
 	})
 }
 
-func (b *Binder) resolveConstructor(fn any, typeName string, modName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
+func (b *Binder) resolveConstructor(fn any, typeName, modName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 
@@ -214,7 +214,7 @@ func writeChain(b *strings.Builder, dep, requiredBy string, cause error, indent 
 	var next *di.ErrMissingDependency
 	if errors.As(cause, &next) {
 		writeChain(b, next.Type, dep, next.Cause, indent+"  ")
-	} else if chainable, ok := cause.(*errutil.ChainableError); ok {
+	} else if chainable := new(errutil.ChainableError); errors.As(cause, &chainable) {
 		b.WriteString(errutil.FormatChain(chainable.Type, chainable.RequiredBy, chainable.Cause, indent))
 	} else if cause != nil {
 		fmt.Fprintf(b, "%s  %s", indent, cause.Error())

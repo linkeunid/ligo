@@ -25,19 +25,14 @@ func TestAdapterHandle(t *testing.T) {
 		called = true
 		return ctx.String(200, "ok")
 	})
-	if !called {
-		// Handler is registered, not called yet
-	}
+	_ = called // handler is registered, not called yet — presence is the assertion
 }
 
 func TestAdapterServe(t *testing.T) {
 	a := NewAdapter()
 	// We don't actually start the server in tests
 	// Just verify the method exists and returns an error for invalid addr
-	err := a.Serve("invalid")
-	if err == nil {
-		// Server might fail to start, which is expected
-	}
+	_ = a.Serve("invalid") // either path is acceptable — we only assert the method exists
 }
 
 func TestGroupAdapterImplementsRouter(t *testing.T) {
