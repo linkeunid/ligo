@@ -184,14 +184,20 @@ func WithModuleHooks(opts ...ModuleHookOption) module.ModuleOption {
 // The factory function receives the options and returns a configured module.
 // This is useful for creating modules that need runtime configuration.
 //
-// Example:
+// Type safety: opts is intentionally typed as ...any. This is the framework's
+// escape hatch for runtime-configured modules; the factory is responsible for
+// type-asserting each option. For statically-known configuration prefer a
+// typed constructor that returns a Module directly — no Dynamic needed:
 //
+//	// Prefer this when configuration is fixed at compile time:
+//	func ConfigModule(folder string) ligo.Module {
+//	    return ligo.NewModule("config", ligo.Providers(NewConfigService(folder)))
+//	}
+//
+//	// Use Dynamic only when the factory must accept heterogeneous opts:
 //	func RegisterConfigModule(folder string) ligo.Module {
 //	    return ligo.NewModule("config",
-//	        ligo.Dynamic(
-//	            NewConfigModule,
-//	            folder,
-//	        ),
+//	        ligo.Dynamic(NewConfigModule, folder),
 //	    )
 //	}
 func Dynamic(factory func(...any) module.Module, opts ...any) module.ModuleOption {
