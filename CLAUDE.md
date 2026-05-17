@@ -31,11 +31,11 @@ go mod tidy                             # Tidy deps
 
 ### Static analysis stack
 
-Every ligo* repo ships `.golangci.yml` enabling `errcheck`, `govet`,
-`ineffassign`, `staticcheck`, `unused`, `gofumpt`, `misspell`,
-`unconvert`, `unparam`, `revive`, `bodyclose`, `errorlint`,
-`nolintlint`. `govet.enable` adds gopls's `infertypeargs`, `shadow`,
-`nilness`, and `fieldalignment`.
+Every ligo* repo ships `.golangci.yml` (schema v2) enabling
+`errcheck`, `govet`, `ineffassign`, `staticcheck`, `unused`, `gofumpt`,
+`misspell`, `unconvert`, `unparam`, `revive`, `bodyclose`, `errorlint`,
+`nolintlint`, `whitespace`, `tagalign`, `gci`. `govet.enable` adds
+`shadow` and `nilness`.
 
 `infertypeargs` flags `Pkg.Generic[T](...)` calls where `T` is
 inferable from the arguments. Required reading:
@@ -49,7 +49,7 @@ and drift out of sync with the underlying signature.
 Install the toolchain once:
 
 ```bash
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 go install honnef.co/go/tools/cmd/staticcheck@latest
 go install mvdan.cc/gofumpt@latest
 go install golang.org/x/vuln/cmd/govulncheck@latest
@@ -126,7 +126,7 @@ gci write --skip-generated -s standard -s default \
     -s "prefix(github.com/linkeunid/)" --custom-order .  # imports order
 gofumpt -w .            # auto-fix formatting
 go test -race ./...     # tests + race detector
-golangci-lint run       # static checks (incl. infertypeargs, gci, tagalign)
+golangci-lint run       # static checks (incl. gci, gofumpt, tagalign)
 govulncheck ./...       # CVE scan — must come back clean for stdlib
 ```
 
@@ -137,10 +137,13 @@ informational; ones in actual call paths block release.
 ### CI
 
 `.github/workflows/ci.yml` runs three jobs on every push to `main` and on
-every PR: `golangci-lint` (with the shared `.golangci.yml`), `go test
--race`, and `govulncheck`. infertypeargs drift, unformatted imports,
-unwrapped errors, etc. fail the build before merge. Mirror the same
-workflow into every ligo* repo so the contract stays uniform.
+every PR: `golangci-lint` v2 (with the shared `.golangci.yml`), `go test
+-race`, and `govulncheck`. Import-order drift, unformatted code,
+unwrapped errors, stdlib CVEs, etc. fail the build before merge. Mirror
+the same workflow into every ligo* repo so the contract stays uniform.
+Action versions are pinned to the Node-24 runtime (checkout v6,
+setup-go v6, golangci-lint-action v9) ahead of GitHub's 2026-09-16
+Node-20 removal.
 
 ## Conventions
 

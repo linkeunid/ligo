@@ -8,6 +8,44 @@ This guide helps you migrate your Ligo applications between versions.
 
 ## [Migration Guide: 0.8 → 0.9](#08-→-09)
 
+## [Migration Guide: 0.9.0 → 0.9.6](#090-→-096)
+
+---
+
+## 0.9.0 → 0.9.6
+
+No source-level breaking changes — drop-in upgrade. Several internal
+improvements landed across the patch series that consumers will want
+to know about.
+
+### Race-safe `App.Container()` / `Adapter.Shutdown()`
+
+The container handle and the underlying `http.Server` are now stored as
+`atomic.Pointer[T]`. Tests that spawned `App.Run()` in a goroutine and
+read `app.Container()` from the parent goroutine could race on Go 1.25
+under `-race`; the upgrade removes the race without any API change.
+
+### Go 1.25.10 baseline
+
+`go.mod` requires Go 1.25.10. The bump is driven by `govulncheck` — Go
+1.25.9 had three reachable stdlib CVEs (`GO-2026-4986`, `GO-2026-4977`,
+`GO-2026-4971`) fixed in 1.25.10. Consumers should bump their own
+`go.mod` directive to 1.25.10 or newer.
+
+### `.golangci.yml` migrated to golangci-lint v2
+
+The shared linter config is now v2-schema. v1.x is no longer compatible
+with Go 1.25 (the v1 binary refuses to analyse newer Go versions).
+`gopls`'s `infertypeargs` analyser is no longer available to
+`golangci-lint v2` (lives in an internal package), so it now runs only
+in the editor via gopls — see `CLAUDE.md` for the IDE-only note.
+
+### CI: Node 24 actions
+
+`actions/checkout@v6`, `actions/setup-go@v6`, and
+`golangci/golangci-lint-action@v9` (Node-24 runtime) silence the Node
+20 deprecation warning ahead of GitHub's 2026-09-16 removal.
+
 ---
 
 ## 0.8 → 0.9

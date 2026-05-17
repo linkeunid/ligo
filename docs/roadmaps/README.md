@@ -35,7 +35,7 @@ HTTP router adapter implementations and proposals.
 - Stdlib (Proposed)
 
 ### [0.9 Release](./1.0-release.md)
-Completed checklist for the v0.9.0 release.
+Completed checklist for the v0.9.6 release.
 - Documentation requirements ✅
 - Testing coverage goals ✅
 - Stability guarantees ✅
