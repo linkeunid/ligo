@@ -129,6 +129,49 @@ propagates the joined error to callers.
 error messages. It now returns `errors.Join` of every hook failure so
 calling code can `errors.As` to inspect specific causes.
 
+### Module middleware no longer prefixes routes
+
+Previously, attaching middleware to a module silently re-namespaced every
+route in that module under `/<module-name>/...` — adding a logger
+middleware turned `/users` into `/auth/users`. Routes now keep their
+declared paths regardless of middleware attachment. The middleware is
+applied through an isolated sub-group with an empty prefix, so other
+modules are unaffected. If you actually want a module-level path prefix,
+declare it explicitly in your route paths (`/auth/login` instead of
+`/login` inside the auth module).
+
+### `RouteBuilder.Handle()` panics on missing handler
+
+`.GET("/x").Guard(...)` without `.Handle(fn)` used to silently skip
+registration, producing a 404 at runtime instead of a registration-time
+error. Builds now panic with `ligo: GET /x has no handler — call
+.Handle(fn) on the route builder`. Build-time misuse is fatal; runtime
+404s are reserved for unmatched paths.
+
+### Guards return `ErrGuardDenied`
+
+When a `Guard` returns `(false, nil)`, the wrapper now returns the
+sentinel `ligo.ErrGuardDenied` instead of `fmt.Errorf("guard denied
+access")`. ExceptionFilters detect it with `errors.Is(err,
+ligo.ErrGuardDenied)` and typically map to HTTP 403:
+
+```go
+func AuthFilter(err error, ctx ligo.Context) error {
+    if errors.Is(err, ligo.ErrGuardDenied) {
+        return ctx.Forbidden("not allowed")
+    }
+    return err
+}
+```
+
+### `Context.Stream` now takes `io.Reader`
+
+`Stream(reader any) error` is now `Stream(reader io.Reader) error`.
+Passing a non-reader value used to fail at runtime with a 400 (echo
+adapter) or silently no-op (mock). Type-mismatched calls now fail at
+compile time. If your reader needs to be closed, pass an `io.ReadCloser`
+— the echo adapter detects `io.Closer` and closes after streaming.
+
 ### Logger options now compose correctly
 
 `logger.WithJSON()`, `logger.WithText()`, and `logger.WithDebug()`

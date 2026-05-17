@@ -1,8 +1,14 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 )
+
+// ErrGuardDenied is wrapped by the route handler when any registered Guard
+// returns (false, nil). ExceptionFilters can detect it with
+// errors.Is(err, ligo.ErrGuardDenied) and map it to HTTP 403.
+var ErrGuardDenied = errors.New("ligo: guard denied access")
 
 // ApplyMiddleware applies middleware in reverse order to a handler.
 // This is a shared utility to avoid duplicating the reverse loop pattern.
@@ -80,7 +86,9 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 		h = handler[0]
 	}
 	if h == nil {
-		return // No handler to register
+		// Build-time misuse, not a runtime condition — fail loud so the
+		// startup author sees it rather than a silent 404 in production.
+		panic(fmt.Sprintf("ligo: %s %s has no handler — call .Handle(fn) on the route builder", rb.method, rb.path))
 	}
 	wrapped := h
 
@@ -116,7 +124,7 @@ func (rb *routeBuilder) Handle(handler ...HandlerFunc) {
 					return err
 				}
 				if !allowed {
-					return fmt.Errorf("guard denied access")
+					return ErrGuardDenied
 				}
 			}
 			return prev(ctx)

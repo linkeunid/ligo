@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -150,7 +151,7 @@ func (m *MockContext) BadGateway(msg ...string) error                           
 func (m *MockContext) ServiceUnavailable(msg ...string) error                    { return nil }
 func (m *MockContext) GatewayTimeout(msg ...string) error                        { return nil }
 func (m *MockContext) HTTPVersionNotSupported(msg ...string) error               { return nil }
-func (m *MockContext) Stream(reader any) error                                   { return nil }
+func (m *MockContext) Stream(reader io.Reader) error                             { return nil }
 
 // MockLogger is a mock implementation of logger.Logger for testing.
 type MockLogger struct {

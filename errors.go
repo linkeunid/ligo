@@ -32,3 +32,8 @@ type ErrControllerBinding = http.ErrControllerBinding
 // ErrBadRequest is wrapped by param-parsing pipes (UUIDPipe, ParseIntPipe, ParseBoolPipe)
 // when a path parameter is invalid. Detect it with errors.Is(err, ligo.ErrBadRequest).
 var ErrBadRequest = http.ErrBadRequest
+
+// ErrGuardDenied is returned by the route handler when a Guard returns
+// (false, nil). ExceptionFilters detect it with
+// errors.Is(err, ligo.ErrGuardDenied) and typically map to HTTP 403.
+var ErrGuardDenied = http.ErrGuardDenied

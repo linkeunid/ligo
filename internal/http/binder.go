@@ -65,7 +65,13 @@ func (b *Binder) bindModuleControllers(mod module.Module) ([]lifecycle.Hooks, er
 
 	router := b.router
 	if len(modMw) > 0 {
-		g := b.router.Group("/" + mod.Name)
+		// Isolate module middleware in a sub-group with no URL prefix.
+		// Previously this used "/" + mod.Name, which silently shifted every
+		// route under /<module-name>/... whenever a module added middleware.
+		// Routes now keep their declared paths regardless of middleware
+		// attachment. Opt-in path prefixing should be a separate explicit
+		// module option (not implemented here).
+		g := b.router.Group("")
 		for _, mw := range modMw {
 			g.Use(mw)
 		}
@@ -95,34 +101,39 @@ func (b *Binder) bindModuleControllers(mod module.Module) ([]lifecycle.Hooks, er
 }
 
 func (b *Binder) resolveMiddleware(mc module.MiddlewareConstructor, modName string) (Middleware, error) {
-	return b.resolveConstructor(mc.Fn, "Middleware", modName, func(v reflect.Value) (Middleware, error) {
+	return resolveConstructor(b, mc.Fn, "Middleware", modName, func(v reflect.Value) (Middleware, error) {
 		mw, ok := v.Interface().(Middleware)
 		if !ok {
-			return nil, fmt.Errorf("ligo: constructor must return Middleware")
+			return Middleware(nil), fmt.Errorf("ligo: constructor must return Middleware")
 		}
 		return mw, nil
 	})
 }
 
-func (b *Binder) resolveConstructor(fn any, typeName, modName string, validate func(reflect.Value) (Middleware, error)) (Middleware, error) {
+// resolveConstructor invokes a DI-aware constructor function and runs the
+// caller's validator on its first return value. Generic over the validator's
+// output so the Middleware path returns Middleware while the Controller path
+// returns the captured controller value (or any zero value the caller
+// chooses) without losing static type safety.
+func resolveConstructor[T any](b *Binder, fn any, typeName, modName string, validate func(reflect.Value) (T, error)) (T, error) {
+	var zero T
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 
 	if fnType.Kind() != reflect.Func {
-		return nil, fmt.Errorf("ligo: %s must be a function", typeName)
+		return zero, fmt.Errorf("ligo: %s must be a function", typeName)
 	}
 
 	argTypes := make([]reflect.Type, fnType.NumIn())
-	for i := 0; i < fnType.NumIn(); i++ {
+	for i := range fnType.NumIn() {
 		argTypes[i] = fnType.In(i)
 	}
 
-	// Resolve dependencies
 	args := make([]reflect.Value, len(argTypes))
 	for i, argType := range argTypes {
 		resolved, err := di.ResolveByType(b.container, argType)
 		if err != nil {
-			return nil, &ErrControllerBinding{
+			return zero, &ErrControllerBinding{
 				Module:     modName,
 				TypeName:   typeName,
 				Dependency: argType.String(),
@@ -132,10 +143,9 @@ func (b *Binder) resolveConstructor(fn any, typeName, modName string, validate f
 		args[i] = reflect.ValueOf(resolved)
 	}
 
-	// Call constructor
 	out := fnValue.Call(args)
 	if len(out) == 0 {
-		return nil, fmt.Errorf("ligo: %s constructor must return a value", typeName)
+		return zero, fmt.Errorf("ligo: %s constructor must return a value", typeName)
 	}
 
 	return validate(out[0])
@@ -147,7 +157,7 @@ func (b *Binder) bindController(cc module.ControllerConstructor, router Router, 
 	// Unwrap controller constructor if wrapped with HookedController
 	constructorFn, _ := unwrapController(cc.Fn)
 
-	_, err := b.resolveConstructor(constructorFn, "Controller", modName, func(v reflect.Value) (Middleware, error) {
+	_, err := resolveConstructor(b, constructorFn, "Controller", modName, func(v reflect.Value) (any, error) {
 		// Capture the controller value for hook collection
 		capturedCtrl = v.Interface()
 

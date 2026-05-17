@@ -1,6 +1,7 @@
 package http
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/linkeunid/ligo/internal/di"
@@ -79,5 +80,7 @@ type Context interface {
 	ServiceUnavailable(msg ...string) error
 	GatewayTimeout(msg ...string) error
 	HTTPVersionNotSupported(msg ...string) error
-	Stream(reader any) error
+	// Stream writes the contents of reader to the response. If reader also
+	// implements io.Closer the adapter closes it when streaming completes.
+	Stream(reader io.Reader) error
 }

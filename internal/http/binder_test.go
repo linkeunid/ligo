@@ -11,14 +11,24 @@ import (
 )
 
 type mockRouter struct {
-	routes []string
+	routes        []string
+	groupPrefixes []string
+	useCount      int
+	handleFunc    func(method, path string, h HandlerFunc)
 }
 
-func (m *mockRouter) Group(prefix string) Router { return m }
-func (m *mockRouter) Use(mw ...Middleware)       {}
-func (m *mockRouter) Serve(addr string) error    { return nil }
-func (m *mockRouter) Handle(method, path string, _ HandlerFunc) {
+func (m *mockRouter) Group(prefix string) Router {
+	m.groupPrefixes = append(m.groupPrefixes, prefix)
+	return m
+}
+
+func (m *mockRouter) Use(mw ...Middleware)    { m.useCount += len(mw) }
+func (m *mockRouter) Serve(addr string) error { return nil }
+func (m *mockRouter) Handle(method, path string, h HandlerFunc) {
 	m.routes = append(m.routes, method+":"+path)
+	if m.handleFunc != nil {
+		m.handleFunc(method, path, h)
+	}
 }
 
 type mockController struct {
@@ -130,6 +140,62 @@ func TestBindControllers_ImportRecursion(t *testing.T) {
 			t.Errorf("controller Routes() called %d times, want 1", calls.Load())
 		}
 	})
+}
+
+func TestBindModule_MiddlewareDoesNotPrefixRoutes(t *testing.T) {
+	var calls atomic.Int32
+
+	mw := func(next HandlerFunc) HandlerFunc { return next }
+	mwCtor := func() Middleware { return mw }
+
+	mod := module.New(
+		"auth",
+		module.Middlewares(mwCtor),
+		module.Controllers(newMockController("/users", &calls)),
+	)
+
+	router := &mockRouter{}
+	c := di.New()
+	log := logger.New()
+	binder := NewBinder(c, router, log)
+
+	if _, err := binder.BindControllers([]module.Module{mod}); err != nil {
+		t.Fatalf("BindControllers: %v", err)
+	}
+
+	if len(router.routes) != 1 || router.routes[0] != "GET:/users" {
+		t.Errorf("expected GET:/users, got %v", router.routes)
+	}
+	// Sub-group is created (so middleware is isolated) but with empty prefix.
+	if len(router.groupPrefixes) != 1 || router.groupPrefixes[0] != "" {
+		t.Errorf("expected empty group prefix, got %v", router.groupPrefixes)
+	}
+	if router.useCount != 1 {
+		t.Errorf("expected 1 middleware Use call, got %d", router.useCount)
+	}
+}
+
+func TestBindModule_NoMiddlewareSkipsGroup(t *testing.T) {
+	var calls atomic.Int32
+
+	mod := module.New(
+		"plain",
+		module.Controllers(newMockController("/health", &calls)),
+	)
+
+	router := &mockRouter{}
+	binder := NewBinder(di.New(), router, logger.New())
+
+	if _, err := binder.BindControllers([]module.Module{mod}); err != nil {
+		t.Fatalf("BindControllers: %v", err)
+	}
+
+	if len(router.groupPrefixes) != 0 {
+		t.Errorf("expected no Group call, got %v", router.groupPrefixes)
+	}
+	if router.useCount != 0 {
+		t.Errorf("expected no Use call, got %d", router.useCount)
+	}
 }
 
 type myBinderService struct{}

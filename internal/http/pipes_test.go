@@ -1,6 +1,7 @@
 package http
 
 import (
+	"io"
 	nethttp "net/http"
 	"strings"
 	"testing"
@@ -63,7 +64,7 @@ func (mockContextBase) ServiceUnavailable(_ ...string) error      { return nil }
 func (mockContextBase) GatewayTimeout(_ ...string) error          { return nil }
 func (mockContextBase) HTTPVersionNotSupported(_ ...string) error { return nil }
 func (mockContextBase) Header(_ string) string                    { return "" }
-func (mockContextBase) Stream(_ any) error                        { return nil }
+func (mockContextBase) Stream(_ io.Reader) error                  { return nil }
 func (mockContextBase) Request() *nethttp.Request                 { return nil }
 func (mockContextBase) Response() nethttp.ResponseWriter          { return nil }
 func (mockContextBase) SetRequestContainer(_ *di.Container)       {}

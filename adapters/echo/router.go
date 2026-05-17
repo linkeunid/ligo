@@ -369,12 +369,9 @@ func (ca *contextAdapter) HTTPVersionNotSupported(msg ...string) error {
 	return ca.errorResponse(http.StatusHTTPVersionNotSupported, msg...)
 }
 
-func (ca *contextAdapter) Stream(reader any) error {
-	r, ok := reader.(io.ReadCloser)
-	if !ok {
-		return ca.c.JSON(http.StatusBadRequest, map[string]string{errorMsgKey: "invalid reader"})
+func (ca *contextAdapter) Stream(reader io.Reader) error {
+	if closer, ok := reader.(io.Closer); ok {
+		defer closer.Close()
 	}
-	defer r.Close()
-
-	return ca.c.Stream(http.StatusOK, "", r)
+	return ca.c.Stream(http.StatusOK, "", reader)
 }
