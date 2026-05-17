@@ -4,8 +4,8 @@ A modular Go framework with lightweight dependency injection, inspired by NestJS
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://go.dev/dl)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-364%20passing-brightgreen)](https://github.com/linkeunid/ligo)
-[![Coverage](https://img.shields.io/badge/coverage-76.3%25-brightgreen)](https://github.com/linkeunid/ligo)
+[![Tests](https://img.shields.io/badge/tests-377%20passing-brightgreen)](https://github.com/linkeunid/ligo)
+[![Coverage](https://img.shields.io/badge/coverage-77.7%25-brightgreen)](https://github.com/linkeunid/ligo)
 
 > **Note:** Ligo **v0.11.0** is available. `Context` is now a concrete struct that wraps the new `Adapter` interface — handlers receive `*ligo.Context` and adapters implement 14 methods instead of 45. `ctx.OK(...)`, `ctx.BadRequest(...)`, `ctx.QueryInt(...)` all keep working. See the [Migration Guide](docs/migration.md).
 

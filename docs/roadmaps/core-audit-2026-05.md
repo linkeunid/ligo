@@ -546,3 +546,80 @@ github.com/linkeunid/ligo/internal/testing              0.0%
 github.com/linkeunid/ligo/internal/validation           0.0%
 Total                                                  46.8%
 ```
+
+---
+
+## Closure status (2026-05-17)
+
+All 57 findings resolved. v0.11.0 candidate.
+
+Coverage moved from **46.8% → 77.7%** total. Test count moved from **213 → 377** passing tests.
+
+### BLOCKERs (6 / 6)
+
+| ID | Closed in | Note |
+|---|---|---|
+| BLOCKER-001 duplicate-container-packages | `a12e8ef` | `internal/core/container` collapsed into `internal/di` |
+| BLOCKER-002 mockcontext-missing-imateapot | `e84571b` | ImATeapot added; static interface assertion in place |
+| BLOCKER-003 echo-contextpool-get-never-put | `e84571b` | Pool removed (Get-never-Put = pure overhead) |
+| BLOCKER-004 timeoutinterceptor-ctx-and-leak | `1e6a4f2` | Request-context derivation; leak window documented |
+| BLOCKER-005 binder-module-mw-prefixes-routes | `e819aa5` | Module name no longer used as URL prefix |
+| BLOCKER-006 duplicate-validateexhaustive | `1e6a4f2` | Single implementation in `internal/validation` |
+
+### MAJORs (31 / 31)
+
+| ID | Closed in | Note |
+|---|---|---|
+| MAJOR-001..003 lifecycle thread-safety / rollback | `c252425` | sync.Mutex; sync.Once for start; rollback path |
+| MAJOR-004..005 logger options / race | `8b192e6` | Composing options; race-free SetDebug |
+| MAJOR-006 module two hook paths | `7de2c44` | Functional hooks collapsed onto Hooks registry |
+| MAJOR-007..009 app reflective lookup / discarded assertion / dead branch | `c252425` | Typed `Provider.Fn`; explicit assertion; dead branch deleted |
+| MAJOR-010 server shutdown errors swallowed | `bd825bd` | `errors.Join` over OnStop + router.Shutdown |
+| MAJOR-011 server ErrAddrInUse contract | `bd825bd` | `IsAddrInUse` + sentinel exported |
+| MAJOR-012 guard-denied generic error | `e819aa5` | `ErrGuardDenied` sentinel |
+| MAJOR-013 silent nil handler | `e819aa5` | Panics on nil with clear message |
+| MAJOR-014 Context interface bloat | `d761c19` | Context → concrete struct embedding 14-method Adapter |
+| MAJOR-015 Stream(any) | `e819aa5` | Tightened to `io.Reader` |
+| MAJOR-016 resolveConstructor validator type | `e819aa5` | Generic `resolveConstructor[T]` |
+| MAJOR-017..019 throttle globals / eviction / coarse mutex | `1e6a4f2` | `Throttler` struct; arbitrary-entry eviction documented; per-entry lock |
+| MAJOR-020 validation `"x"` substitution | `1e6a4f2` | Format-tag UX fix; suppress format tags when "required" fails |
+| MAJOR-021 FormatChain unbounded recursion | `1e6a4f2` | Depth cap with truncation marker |
+| MAJOR-022 echo SetContainer double-mw | `e84571b` | Idempotent install via `reqScopeInstalled bool` |
+| MAJOR-023 groupAdapter.Serve no-op | `e84571b` | `ErrServeOnGroup` sentinel |
+| MAJOR-024 echo Stream bad classification | `e819aa5` | Type-assert path removed after MAJOR-015 |
+| MAJOR-025 mockcontext no-op Bind | `e84571b` | `SetBody` / `WithBindError` etc. injectable |
+| MAJOR-026..031 DI + app shutdown error context | `a12e8ef` / `bd825bd` | `errors.Join` + Unwrap + RequiredBy fixes |
+
+### MINORs (4 / 4)
+
+| ID | Closed in | Note |
+|---|---|---|
+| MINOR-001 root-files not thin re-exports | `024574e` | CLAUDE.md convention updated to match reality |
+| MINOR-002 modulehookregistry method order | `62bbff1` | Reordered |
+| MINOR-003 registry inconsistent semantics | `62bbff1` | HookRegistry vs ModuleHookRegistry semantics documented |
+| MINOR-004 hooks.Refresh value-receiver | `62bbff1` | Pointer receiver |
+
+### SIMPs (9 / 9)
+
+| ID | Closed in | Note |
+|---|---|---|
+| SIMP-001 logger.ExtractProviderName deprecated shim | `62bbff1` | Removed |
+| SIMP-002 module DynamicModule untyped options | `7032c8a` | Doc clarifies it's an escape hatch |
+| SIMP-003 echo addrinuse string-match | `bd825bd` | `errors.Is(err, syscall.EADDRINUSE)` |
+| SIMP-004 chainrouter manual forwarding | `62bbff1` | `chainRouter` embeds `Router` |
+| SIMP-005 pool.ContextPool redundant | `62bbff1` | Removed (zero-behavior wrapper) |
+| SIMP-006 reflectutil.ExtractTypeNameFromFunc duplication | `62bbff1` | Removed (duplicated branch) |
+| SIMP-007..009 di error types | `a12e8ef` | Consolidated; duplicate fields removed; nil-checks dropped |
+
+### TESTs (7 / 7)
+
+| ID | Closed in | Note |
+|---|---|---|
+| TEST-001 di zero coverage | `9aa1feb` | `internal/di/container_test.go` added |
+| TEST-002 lifecycle coverage | `2b49bb5` | Registry + dispatch coverage |
+| TEST-003 http internals low coverage | `2b49bb5` | Builder / chain / pipes / interceptors covered |
+| TEST-004 http subpackages zero coverage | `1e6a4f2` (guards) + this commit (pipes) | `guards_test.go` + `pipes_test.go` (100% pipes) |
+| TEST-005 leaf packages zero coverage | `9aa1feb` | pool, reflect, validation, errors covered |
+| TEST-006 echo adapter low coverage | `9aa1feb` | Full context adapter sweep |
+| TEST-007 testing zero coverage | `2b49bb5` | `mocks_test.go` + `app_test.go` |
+
